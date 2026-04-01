@@ -1,0 +1,30 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';                    // ← ADD THIS
+import 'package:mobile/core/providers/signup_provider.dart';
+import 'package:mobile/navigation/router.dart';
+
+void main() {
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => SignupProvider(),
+      child: MyApp(router: appRouter),  // ← use appRouter directly, no AppRouter()
+    ),
+  );
+}
+
+class MyApp extends StatefulWidget {
+  final GoRouter router;
+  const MyApp({super.key, required this.router});
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      routerConfig: widget.router,
+    );
+  }
+}
