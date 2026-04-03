@@ -45,6 +45,8 @@ dev_dependencies:
   provider: ^6.0.5
   shared_preferences: ^2.0.15
   google_fonts: ^6.2.1
+  http: ^1.2.0
+  flutter_secure_storage: ^9.0.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

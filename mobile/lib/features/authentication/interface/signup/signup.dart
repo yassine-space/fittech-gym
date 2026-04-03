@@ -20,6 +20,12 @@ class _SignupScreenState extends State<SignupScreen> {
       curve: Curves.ease,
     );
   }
+  void previousPage() {
+    controller.previousPage(
+      duration: Duration(milliseconds: 300),
+      curve: Curves.ease,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,8 +35,8 @@ class _SignupScreenState extends State<SignupScreen> {
         physics: NeverScrollableScrollPhysics(),
         children: [
           Step1(onNext: nextPage),
-          Step2(onNext: nextPage),
-          Step3(),
+          Step2(onNext: nextPage,onPrevious: previousPage),
+          Step3(onPrevious: previousPage),
         ],
       ),
     );

@@ -1,4 +1,4 @@
-//This file stores data while user moves between pages
+//This file stores data while user moves between singup pages
 
 
 import 'package:flutter/material.dart';

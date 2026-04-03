@@ -6,9 +6,9 @@ import '../../../../core/widgets/role_button.dart';
 import '../../../../core/widgets/custom_text_field.dart';
 import '../../../../core/widgets/primary_button.dart';
 import 'package:go_router/go_router.dart';
+
 class Step1 extends StatefulWidget {
   final VoidCallback onNext;
-
   const Step1({super.key, required this.onNext});
 
   @override
@@ -16,12 +16,15 @@ class Step1 extends StatefulWidget {
 }
 
 class _Step1State extends State<Step1> {
-  int selectedRole = 0;
 
-  final _prenomController = TextEditingController();
-  final _nomController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
+  int selectedRole = 0;
+  late TextEditingController _prenomController;
+  late TextEditingController _nomController;
+  late TextEditingController _emailController;
+  late TextEditingController _phoneController;
+
+    
+ 
 
   @override
   void dispose() {
@@ -31,6 +34,21 @@ class _Step1State extends State<Step1> {
     _phoneController.dispose();
     super.dispose();
   }
+
+  @override
+void initState() {
+  super.initState();
+
+  // Read existing data from provider
+  final provider = context.read<SignupProvider>();
+
+  // Pre-fill controllers with saved data
+  _prenomController = TextEditingController(text: provider.data.prenom);
+  _nomController    = TextEditingController(text: provider.data.nom);
+  _emailController  = TextEditingController(text: provider.data.email);
+  _phoneController  = TextEditingController(text: provider.data.phone);
+  selectedRole = provider.data.role;
+}
 
   void _handleNext() {
     // Basic validation
@@ -49,7 +67,9 @@ class _Step1State extends State<Step1> {
     // Save data
     provider.updateEmail(_emailController.text);
     provider.updatePhone(_phoneController.text);
-    
+    provider.updateNom(_nomController.text); 
+    provider.updatePrenom(_prenomController.text);
+    provider.updateRole(selectedRole);
     // Go to next step
     widget.onNext();
   }

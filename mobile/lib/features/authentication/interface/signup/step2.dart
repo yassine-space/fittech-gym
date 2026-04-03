@@ -6,7 +6,8 @@ import '../../../../core/widgets/primary_button.dart';
 
 class Step2 extends StatefulWidget {
   final VoidCallback onNext;
-  const Step2({super.key, required this.onNext});
+  final VoidCallback onPrevious;
+  const Step2({super.key, required this.onNext, required this.onPrevious});
 
   @override
   State<Step2> createState() => _Step2State();
@@ -19,6 +20,18 @@ class _Step2State extends State<Step2> {
   bool _obscureConfirm = true;
   String? _errorMessage;
 
+  @override
+  void initState() {
+    super.initState();
+    final provider = context.read<SignupProvider>();
+    _passwordController.text = provider.data.password ;
+    _confirmController.text = provider.data.password ;
+  }
+
+  void _back() {
+    widget.onPrevious();
+
+  }
   void _next() {
     final password = _passwordController.text.trim();
     final confirm = _confirmController.text.trim();
@@ -128,6 +141,11 @@ class _Step2State extends State<Step2> {
               PrimaryButton(
                 text: 'Suivant',
                 onPressed: _next,
+              ),
+              const SizedBox(height: 20),
+              PrimaryButton(
+                text: 'back',
+                onPressed: _back,
               ),
             ],
           ),

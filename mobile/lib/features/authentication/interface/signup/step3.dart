@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/services/apiservice.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile/core/providers/signup_provider.dart';
 import '../../../../core/widgets/goal_card.dart';
 import '../../../../core/widgets/primary_button.dart';
-
+import 'package:dio/dio.dart';
 class Step3 extends StatefulWidget {
-  const Step3({super.key});
+  final VoidCallback onPrevious;
+  const Step3({super.key, required this.onPrevious});
 
   @override
   State<Step3> createState() => _Step3State();
@@ -14,6 +16,10 @@ class Step3 extends StatefulWidget {
 class _Step3State extends State<Step3> {
   bool _isLoading = false;
   String? _errorMessage;
+
+  void _back() {
+    widget.onPrevious();
+  }
 
   // Available fitness goals
   final List<Map<String, dynamic>> _goals = [
@@ -39,23 +45,22 @@ class _Step3State extends State<Step3> {
     setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
-      // TODO: replace with your real API call
-      await Future.delayed(const Duration(seconds: 2));
+    setState(() => _isLoading = true);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Compte créé avec succès !'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        // context.go(Pages.login); // uncomment when ready
-      }
-    } catch (e) {
-      setState(() => _errorMessage = 'Erreur: ${e.toString()}');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    final response = await Apiservice.instance.register(provider.data);
+
+    if (response.statusCode == 201) {
+      Navigator.pushReplacementNamed(context, '/home');
     }
+
+  } on DioException catch (e) {
+    final message = e.response?.data['message'] ?? 'Erreur serveur';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  } finally {
+    setState(() => _isLoading = false);
+  }
   }
 
   @override
@@ -138,6 +143,11 @@ class _Step3State extends State<Step3> {
                 text: 'Créer mon compte',
                 onPressed: _submit,
                 isLoading: _isLoading,
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _back,
+                child: const Text('Retour'),
               ),
             ],
           ),
