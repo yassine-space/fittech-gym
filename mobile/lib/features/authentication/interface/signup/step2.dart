@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile/core/providers/signup_provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mobile/navigation/pages.dart';
 import '../../../../core/widgets/custom_text_field.dart';
 import '../../../../core/widgets/primary_button.dart';
 
@@ -24,30 +26,31 @@ class _Step2State extends State<Step2> {
   void initState() {
     super.initState();
     final provider = context.read<SignupProvider>();
-    _passwordController.text = provider.data.password ;
-    _confirmController.text = provider.data.password ;
+    _passwordController.text = provider.data.password;
+    _confirmController.text = provider.data.password;
   }
 
   void _back() {
     widget.onPrevious();
-
   }
+
   void _next() {
     final password = _passwordController.text.trim();
     final confirm = _confirmController.text.trim();
 
-    if (password.isEmpty || confirm.isEmpty) {
-      setState(() => _errorMessage = 'Veuillez remplir tous les champs.');
-      return;
-    }
-    if (password.length < 6) {
-      setState(() => _errorMessage = 'Minimum 6 caractères.');
-      return;
-    }
-    if (password != confirm) {
-      setState(() => _errorMessage = 'Les mots de passe ne correspondent pas.');
-      return;
-    }
+    //if (password.isEmpty || confirm.isEmpty) {
+      //setState(() => _errorMessage = 'Veuillez remplir tous les champs.');
+      //return;
+    //}
+    //if (password.length < 6) {
+      //setState(() => _errorMessage = 'Minimum 6 caractères.');
+      //return;
+    //}
+    //if (password != confirm) {
+      //setState(
+        //  () => _errorMessage = 'Les mots de passe ne correspondent pas.');
+      //return;
+    //}
 
     context.read<SignupProvider>().updatePassword(password);
     setState(() => _errorMessage = null);
@@ -64,37 +67,72 @@ class _Step2State extends State<Step2> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFFFF8F6),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Center(
-                child: Text('Inscription',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'Inscription',
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
+
               Center(
                 child: Text(
                   'Créez votre compte FitTech - Étape 2 sur 3',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              // Progress bar
+              // Progress bar — 2 of 3 filled
               Row(
                 children: [
-                  Expanded(child: Container(height: 4, color: Colors.red)),
-                  const SizedBox(width: 6),
-                  Expanded(child: Container(height: 4, color: Colors.red)),
-                  const SizedBox(width: 6),
-                  Expanded(child: Container(height: 4, color: Colors.grey[300])),
+                  Expanded(
+                    child: Container(
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE50000),
+                        borderRadius: BorderRadius.horizontal(
+                          left: Radius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Container(
+                      height: 5,
+                      color: const Color(0xFFE50000),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Container(
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE8E8E8),
+                        borderRadius: BorderRadius.horizontal(
+                          right: Radius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 40),
+
+              const SizedBox(height: 32),
 
               CustomTextField(
                 label: 'Mot de passe *',
@@ -111,9 +149,11 @@ class _Step2State extends State<Step2> {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text('Minimum 6 caractères',
-                  style: TextStyle(color: Colors.grey, fontSize: 12)),
-              const SizedBox(height: 20),
+              Text(
+                'Minimum 6 caractères',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              ),
+              const SizedBox(height: 18),
 
               CustomTextField(
                 label: 'Confirmer le mot de passe *',
@@ -132,20 +172,76 @@ class _Step2State extends State<Step2> {
 
               if (_errorMessage != null) ...[
                 const SizedBox(height: 12),
-                Text(_errorMessage!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Color(0xFFE50000), fontSize: 13),
+                ),
               ],
 
-              const Spacer(),
+              const SizedBox(height: 36),
 
-              PrimaryButton(
-                text: 'Suivant',
-                onPressed: _next,
+              // Buttons row: outlined Retour + filled Suivant
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _back,
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: Colors.grey.shade200,
+                        side:BorderSide.none,
+                      ),
+                      child: const Text(
+                        '<  Retour',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: PrimaryButton(
+                      text: 'Suivant >',
+                      fontSize: 17,
+                      onPressed: _next,
+                    ),
+                  ),
+                ],
               ),
+
               const SizedBox(height: 20),
-              PrimaryButton(
-                text: 'back',
-                onPressed: _back,
+
+              // Already have an account
+              Center(
+                child: RichText(
+                  text: TextSpan(
+                    text: 'Vous avez déjà un compte ? ',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                    children: [
+                      WidgetSpan(
+                        child: GestureDetector(
+                          onTap: () {
+                            context.push(Pages.login);
+                          },
+                          child: const Text(
+                            'Se connecter',
+                            style: TextStyle(
+                              color: Color(0xFFE50000),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),

@@ -1,3 +1,4 @@
+// step1.dart
 import 'package:flutter/material.dart';
 import 'package:mobile/navigation/pages.dart';
 import 'package:provider/provider.dart';
@@ -16,15 +17,28 @@ class Step1 extends StatefulWidget {
 }
 
 class _Step1State extends State<Step1> {
-
+  // 0 = member, 1 = coach — kept as int for the RoleButton UI
   int selectedRole = 0;
+
   late TextEditingController _prenomController;
   late TextEditingController _nomController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
 
-    
- 
+  @override
+  void initState() {
+    super.initState();
+    final provider = context.read<SignupProvider>();
+    _prenomController = TextEditingController(text: provider.data.prenom);
+    _nomController    = TextEditingController(text: provider.data.nom);
+    _emailController  = TextEditingController(text: provider.data.email);
+    _phoneController  = TextEditingController(text: provider.data.phone);
+
+    // Restore previously selected role index
+    if (provider.data.role != null) {
+      selectedRole = provider.isMember ? 0 : 1;
+    }
+  }
 
   @override
   void dispose() {
@@ -35,42 +49,14 @@ class _Step1State extends State<Step1> {
     super.dispose();
   }
 
-  @override
-void initState() {
-  super.initState();
-
-  // Read existing data from provider
-  final provider = context.read<SignupProvider>();
-
-  // Pre-fill controllers with saved data
-  _prenomController = TextEditingController(text: provider.data.prenom);
-  _nomController    = TextEditingController(text: provider.data.nom);
-  _emailController  = TextEditingController(text: provider.data.email);
-  _phoneController  = TextEditingController(text: provider.data.phone);
-  selectedRole = provider.data.role;
-}
-
   void _handleNext() {
-    // Basic validation
-    if (_prenomController.text.isEmpty ||
-        _nomController.text.isEmpty ||
-        _emailController.text.isEmpty ||
-        _phoneController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez remplir tous les champs")),
-      );
-      return;
-    }
-
     final provider = context.read<SignupProvider>();
-
-    // Save data
+    provider.updatePrenom(_prenomController.text);
+    provider.updateNom(_nomController.text);
     provider.updateEmail(_emailController.text);
     provider.updatePhone(_phoneController.text);
-    provider.updateNom(_nomController.text); 
-    provider.updatePrenom(_prenomController.text);
-    provider.updateRole(selectedRole);
-    // Go to next step
+    // Convert int index → UserRole inside the provider
+    provider.updateRoleFromIndex(selectedRole);
     widget.onNext();
   }
 
@@ -87,26 +73,19 @@ void initState() {
               const Center(
                 child: Text(
                   'Inscription',
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 6),
-
               Center(
                 child: Text(
                   'Créez votre compte FitTech - Étape 1 sur 3',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade500,
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
                 ),
               ),
               const SizedBox(height: 24),
 
-              // Progress bar
+              // Progress bar — step 1
               Row(
                 children: [
                   Expanded(
@@ -115,15 +94,13 @@ void initState() {
                       decoration: const BoxDecoration(
                         color: Color(0xFFE50000),
                         borderRadius: BorderRadius.horizontal(
-                          left: Radius.circular(3),
-                        ),
+                            left: Radius.circular(3)),
                       ),
                     ),
                   ),
                   const SizedBox(width: 5),
                   Expanded(
-                    child: Container(height: 5, color: const Color(0xFFE8E8E8)),
-                  ),
+                      child: Container(height: 5, color: const Color(0xFFE8E8E8))),
                   const SizedBox(width: 5),
                   Expanded(
                     child: Container(
@@ -131,8 +108,7 @@ void initState() {
                       decoration: const BoxDecoration(
                         color: Color(0xFFE8E8E8),
                         borderRadius: BorderRadius.horizontal(
-                          right: Radius.circular(3),
-                        ),
+                            right: Radius.circular(3)),
                       ),
                     ),
                   ),
@@ -176,7 +152,7 @@ void initState() {
                   Expanded(
                     child: CustomTextField(
                       label: 'Prénom *',
-                      hint: 'akram',
+                      hint: 'Akram',
                       controller: _prenomController,
                     ),
                   ),
@@ -184,7 +160,7 @@ void initState() {
                   Expanded(
                     child: CustomTextField(
                       label: 'Nom *',
-                      hint: 'teffah',
+                      hint: 'Teffah',
                       controller: _nomController,
                     ),
                   ),
@@ -210,37 +186,35 @@ void initState() {
 
               PrimaryButton(
                 text: 'Suivant >',
+                fontSize: 17,
                 onPressed: _handleNext,
               ),
-              const SizedBox(height: 20),   // ← ADD FROM HERE
-               
-               Center(
-                 child: RichText(
-                   text: TextSpan(
-                     text: 'Vous avez déjà un compte ? ',
-                     style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                     children: [
-                       WidgetSpan(
-                         child: GestureDetector(
-                           onTap: () {
-                              // Navigate to login page
-                              context.push(Pages.login);
-                           },
-                           child: Text(
-                             'Se connecter',
-                             style: TextStyle(
-                               color: Color(0xFFE50000),
-                               fontWeight: FontWeight.w600,
-                               fontSize: 14,
-                             ),
-                           ),
-                         ),
-                       ),
-                     ],
-                   ),
-                 ),
-               ),
-           ],
+              const SizedBox(height: 20),
+
+              Center(
+                child: RichText(
+                  text: TextSpan(
+                    text: 'Vous avez déjà un compte ? ',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                    children: [
+                      WidgetSpan(
+                        child: GestureDetector(
+                          onTap: () => context.push(Pages.login),
+                          child: const Text(
+                            'Se connecter',
+                            style: TextStyle(
+                              color: Color(0xFFE50000),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
