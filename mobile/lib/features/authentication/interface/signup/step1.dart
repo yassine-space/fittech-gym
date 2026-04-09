@@ -20,8 +20,8 @@ class _Step1State extends State<Step1> {
   // 0 = member, 1 = coach — kept as int for the RoleButton UI
   int selectedRole = 0;
 
-  late TextEditingController _prenomController;
-  late TextEditingController _nomController;
+  late TextEditingController _first_nameController;
+  late TextEditingController _last_nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
 
@@ -29,8 +29,8 @@ class _Step1State extends State<Step1> {
   void initState() {
     super.initState();
     final provider = context.read<SignupProvider>();
-    _prenomController = TextEditingController(text: provider.data.prenom);
-    _nomController    = TextEditingController(text: provider.data.nom);
+    _first_nameController = TextEditingController(text: provider.data.first_name);
+    _last_nameController    = TextEditingController(text: provider.data.last_name);
     _emailController  = TextEditingController(text: provider.data.email);
     _phoneController  = TextEditingController(text: provider.data.phone);
 
@@ -42,8 +42,8 @@ class _Step1State extends State<Step1> {
 
   @override
   void dispose() {
-    _prenomController.dispose();
-    _nomController.dispose();
+    _first_nameController.dispose();
+    _last_nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -51,8 +51,8 @@ class _Step1State extends State<Step1> {
 
   void _handleNext() {
     final provider = context.read<SignupProvider>();
-    provider.updatePrenom(_prenomController.text);
-    provider.updateNom(_nomController.text);
+    provider.updatefirst_name(_first_nameController.text);
+    provider.updatelast_name(_last_nameController.text);
     provider.updateEmail(_emailController.text);
     provider.updatePhone(_phoneController.text);
     // Convert int index → UserRole inside the provider
@@ -151,17 +151,17 @@ class _Step1State extends State<Step1> {
                 children: [
                   Expanded(
                     child: CustomTextField(
-                      label: 'Prénom *',
+                      label: 'Prénom*',
                       hint: 'Akram',
-                      controller: _prenomController,
+                      controller: _first_nameController,
                     ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: CustomTextField(
-                      label: 'Nom *',
+                      label: 'nom *',
                       hint: 'Teffah',
-                      controller: _nomController,
+                      controller: _last_nameController,
                     ),
                   ),
                 ],

@@ -12,25 +12,23 @@ class AuthHolder {
 class Apiservice {
   Apiservice._singleton();
   static final Apiservice _instance = Apiservice._singleton();
-  static Apiservice get instance => _instance; // ✅ expose instance
+  static Apiservice get instance => _instance;
 
-  String get baseUrl {
-    if (kDebugMode) {
-      return 'http://127.0.0.1:8000'; // ✅ Django default port is 8000 not 8080
+  // Replace baseUrl in your Apiservice class temporarily
+    String get baseUrl {
+      return 'https://webhook.site/0205c189-5530-4df7-9c8f-deedf13e9c03';
     }
-    return 'https://yourproductiondomain.com';
-  }
 
   final Dio _dio = Dio();
 
   Future<Response> request(
     DioMethode methode,
     String url, {
-    Map<String, dynamic>? data,
+    dynamic data,
+    Options? options,
   }) async {
-    final fullUrl = '$baseUrl$url'; // ✅ always use baseUrl
+    final fullUrl = '$baseUrl$url';
 
-    // Only add token if it exists
     if (AuthHolder.token != null) {
       _dio.options.headers['Authorization'] = 'Bearer ${AuthHolder.token}';
     }
@@ -39,31 +37,59 @@ class Apiservice {
       case DioMethode.get:
         return await _dio.get(fullUrl);
       case DioMethode.post:
-        return await _dio.post(fullUrl, data: data);
+        return await _dio.post(fullUrl, data: data, options: options);
       case DioMethode.put:
-        return await _dio.put(fullUrl, data: data);
+        return await _dio.put(fullUrl, data: data, options: options);
       case DioMethode.delete:
         return await _dio.delete(fullUrl);
     }
   }
 
-  // ✅ Auth methods
+  // ── Register (multipart/form-data) ─────────────────────────────────────────
+  // Sends all signup fields + optional cropped avatar as a single
+  // multipart request. Only the cropped circle image is uploaded —
+  // the original picked file is never sent.
+
   Future<Response> register(SignupData data) async {
+
+    final formData = FormData.fromMap({
+      'first_name':   data.first_name,
+      'last_name':      data.last_name,
+      'email':    data.email,
+      'phone':    data.phone,
+      'password': data.password,
+      'role':     data.role!.name, // 'member' or 'coach'
+
+      if (data.role == UserRole.member)
+        ...Map.fromEntries(
+          data.goals.asMap().entries.map(
+            (e) => MapEntry('goals', e.value),
+          ),
+        ),
+      if (data.role == UserRole.coach)
+        ...Map.fromEntries(
+          data.specialties.asMap().entries.map(
+            (e) => MapEntry('specialties', e.value),
+          ),
+        ),
+
+      // Cropped circle avatar — only included when the user picked a photo.
+      if (data.croppedImagePath != null)
+        'avatar': await MultipartFile.fromFile(
+          data.croppedImagePath!,
+          filename: 'avatar.png',
+        ),
+    });
+
     return await request(
       DioMethode.post,
       '/auth/register/',
-      data: {
-        'prenom':    data.prenom,
-        'nom':       data.nom,
-        'email':     data.email,
-        'phone':     data.phone,
-        'password':  data.password,
-        'role':      data.role,
-        'goals':     data.goals,
-      },
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
     );
   }
 
+  // ── Login ──────────────────────────────────────────────────────────────────
   Future<Response> login(String email, String password) async {
     return await request(
       DioMethode.post,
@@ -74,6 +100,4 @@ class Apiservice {
       },
     );
   }
-
-  
 }
