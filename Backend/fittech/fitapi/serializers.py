@@ -39,7 +39,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("password2")
+        # force member role here
+        validated_data["role"] = "membre"
         user = User.objects.create_user(**validated_data)
+        # also create membre profile
+        Membre.objects.create(user=user)
         return user
 
 
