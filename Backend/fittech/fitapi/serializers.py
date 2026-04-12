@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
+from django.db import transaction
 from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment
 
 
@@ -15,39 +16,95 @@ class UserSerializer(serializers.ModelSerializer):
             "id", "first_name", "last_name", "email",
             "phone", "role", "profile_photo", "created_at", "is_active"
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at","role"]
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    """Used for creating a new user (signup)"""
+    """
+    One-shot registration:
+    - Always creates a User
+    - If role == 'membre'  → also creates a Membre profile
+    - If role == 'coach'   → also creates a Coach profile (is_active=False until admin approves)
 
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    Membre fields (optional): date_of_birth, health_goal, medical_restrictions
+    Coach  fields (optional): specialties, biography, years_of_experience
+    """
+
+    password  = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True, required=True, label="Confirm Password")
+
+    # ── Membre-specific fields ──
+    date_of_birth        = serializers.DateField(required=False, allow_null=True)
+    health_goal          = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    medical_restrictions = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    # ── Coach-specific fields ──
+    specialties          = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    biography            = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    years_of_experience  = serializers.IntegerField(required=False, min_value=0, default=0)
 
     class Meta:
         model = User
         fields = [
-            "id", "first_name", "last_name", "email",
-            "phone", "role", "password", "password2"
+            # user core
+            "id", "first_name", "last_name", "email", "phone", "role",
+            "password", "password2",
+            # membre
+            "date_of_birth", "health_goal", "medical_restrictions",
+            # coach
+            "specialties", "biography", "years_of_experience",
         ]
         read_only_fields = ["id"]
 
     def validate(self, attrs):
         if attrs["password"] != attrs["password2"]:
             raise serializers.ValidationError({"password": "Passwords do not match."})
+
+        role = attrs.get("role", "membre")
+        if role not in ("membre", "coach"):
+            raise serializers.ValidationError(
+                {"role": "Registration is only allowed for 'membre' or 'coach' roles."}
+            )
         return attrs
 
+    @transaction.atomic
     def create(self, validated_data):
+        # ── Pop non-User fields ──
         validated_data.pop("password2")
+
+        membre_fields = {
+            "date_of_birth":        validated_data.pop("date_of_birth", None),
+            "health_goal":          validated_data.pop("health_goal", None),
+            "medical_restrictions": validated_data.pop("medical_restrictions", None),
+        }
+        coach_fields = {
+            "specialties":         validated_data.pop("specialties", None),
+            "biography":           validated_data.pop("biography", None),
+            "years_of_experience": validated_data.pop("years_of_experience", 0),
+        }
+
+        # ── Create User ──
         user = User.objects.create_user(**validated_data)
+
+        # ── Create linked profile ──
+        if user.role == "membre":
+            Membre.objects.create(user=user, **{k: v for k, v in membre_fields.items() if v is not None})
+
+        elif user.role == "coach":
+            Coach.objects.create(
+                user=user,
+                is_active=False,   # pending admin approval
+                **{k: v for k, v in coach_fields.items() if v is not None}
+            )
+
         return user
 
 
 class ChangePasswordSerializer(serializers.Serializer):
     """Used for changing user password"""
 
-    old_password = serializers.CharField(write_only=True, required=True)
-    new_password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    old_password  = serializers.CharField(write_only=True, required=True)
+    new_password  = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     new_password2 = serializers.CharField(write_only=True, required=True, label="Confirm New Password")
 
     def validate(self, attrs):
@@ -89,26 +146,40 @@ class MembreCreateSerializer(serializers.ModelSerializer):
 # Coach Serializers
 # ─────────────────────────────────────────
 class CoachSerializer(serializers.ModelSerializer):
-    """Full coach details"""
+    """Full coach details — is_active is read-only here (use CoachActivateSerializer to change it)"""
 
     user = UserSerializer(read_only=True)
 
     class Meta:
         model = Coach
         fields = [
-            "id", "user", "specialties", "biography", "years_of_experience"
+            "id", "user", "specialties", "biography",
+            "years_of_experience", "is_active"
         ]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "is_active"]   # mutated only by admin via dedicated endpoint
 
 
 class CoachCreateSerializer(serializers.ModelSerializer):
-    """Used when creating/updating a coach profile"""
+    """Used when creating/updating a coach profile (admin)"""
 
     class Meta:
         model = Coach
         fields = [
-            "id", "user", "specialties", "biography", "years_of_experience"
+            "id", "user", "specialties", "biography",
+            "years_of_experience", "is_active"
         ]
+        read_only_fields = ["id"]
+
+
+class CoachActivateSerializer(serializers.ModelSerializer):
+    """
+    Admin-only: flip is_active on a coach profile.
+    PATCH /coaches/<pk>/activate/
+    """
+
+    class Meta:
+        model = Coach
+        fields = ["id", "is_active"]
         read_only_fields = ["id"]
 
 
@@ -134,7 +205,7 @@ class MembreSubscriptionSerializer(serializers.ModelSerializer):
     """Full subscription details with nested info"""
 
     membre = MembreSerializer(read_only=True)
-    plan = SubscriptionPlanSerializer(read_only=True)
+    plan   = SubscriptionPlanSerializer(read_only=True)
 
     class Meta:
         model = MembreSubscription
@@ -168,7 +239,7 @@ class MembreSubscriptionCreateSerializer(serializers.ModelSerializer):
 class PaymentSerializer(serializers.ModelSerializer):
     """Full payment details with nested info"""
 
-    membre = MembreSerializer(read_only=True)
+    membre       = MembreSerializer(read_only=True)
     subscription = MembreSubscriptionSerializer(read_only=True)
 
     class Meta:
