@@ -93,7 +93,7 @@ class Coach(models.Model):
     specialties = models.TextField(blank=True, null=True)
     biography = models.TextField(blank=True, null=True)
     years_of_experience = models.PositiveIntegerField(default=0)
-
+    is_active = models.BooleanField(default=False)
     def __str__(self):
         return f"Coach: {self.user.first_name} {self.user.last_name}"
 

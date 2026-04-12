@@ -19,6 +19,8 @@ from .views import (
     CoachListCreateView,
     CoachDetailView,
     MyCoachProfileView,
+    CoachActivateView,
+    PendingCoachListView,
     # Subscription Plans
     SubscriptionPlanListCreateView,
     SubscriptionPlanDetailView,
@@ -63,6 +65,8 @@ urlpatterns = [
     path("coaches/",                CoachListCreateView.as_view(),  name="coach-list"),
     path("coaches/me/",             MyCoachProfileView.as_view(),   name="coach-me"),
     path("coaches/<uuid:pk>/",      CoachDetailView.as_view(),      name="coach-detail"),
+    path("coaches/<uuid:pk>/activate/", CoachActivateView.as_view(), name="coach-activate"),
+    path("coaches/pending/",        PendingCoachListView.as_view(), name="coach-pending"),
 
     # ─────────────────────────────────────────
     # Subscription Plans
