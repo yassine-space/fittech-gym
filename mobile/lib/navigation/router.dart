@@ -1,7 +1,7 @@
 import 'package:go_router/go_router.dart';
-import 'package:mobile/features/authentication/interface/signup/signup.dart';
-import 'package:mobile/home.dart';
-import 'package:mobile/features/authentication/interface/login.dart';
+import 'package:mobile/features/authentication/signup/signup.dart';
+import 'package:mobile/features/home/home.dart';
+import 'package:mobile/features/authentication/login.dart';
 import 'package:mobile/navigation/pages.dart';
 
 GoRouter appRouter = GoRouter(

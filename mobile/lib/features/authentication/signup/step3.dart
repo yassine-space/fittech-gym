@@ -11,7 +11,7 @@ import 'package:mobile/core/providers/signup_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/navigation/pages.dart';
-import '../../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/primary_button.dart';
 import 'package:image_picker/image_picker.dart';
 
 // ─── Shared mixin ─────────────────────────────────────────────────────────────

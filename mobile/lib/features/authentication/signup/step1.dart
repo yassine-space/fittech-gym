@@ -2,10 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/navigation/pages.dart';
 import 'package:provider/provider.dart';
-import '../../../../core/providers/signup_provider.dart';
-import '../../../../core/widgets/role_button.dart';
-import '../../../../core/widgets/custom_text_field.dart';
-import '../../../../core/widgets/primary_button.dart';
+import '../../../core/providers/signup_provider.dart';
+import '../../../core/widgets/role_button.dart';
+import '../../../core/widgets/custom_text_field.dart';
+import '../../../core/widgets/primary_button.dart';
 import 'package:go_router/go_router.dart';
 
 class Step1 extends StatefulWidget {
