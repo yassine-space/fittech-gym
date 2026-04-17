@@ -32,7 +32,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     password  = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True, required=True, label="Confirm Password")
-
+    profile_photo = serializers.ImageField(required=False, allow_null=True)
     # ── Membre-specific fields ──
     date_of_birth        = serializers.DateField(required=False, allow_null=True)
     health_goal          = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -48,7 +48,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = [
             # user core
             "id", "first_name", "last_name", "email", "phone", "role",
-            "password", "password2",
+            "password", "password2", "profile_photo",
             # membre
             "date_of_birth", "health_goal", "medical_restrictions",
             # coach
