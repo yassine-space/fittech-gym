@@ -20,5 +20,5 @@ from django.urls import path,include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/", include("fitapi.urls")),  # Uncomment when fitapi/urls.py is created
+    path("", include("fitapi.urls")),  # Uncomment when fitapi/urls.py is created
 ]
