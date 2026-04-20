@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 class PrimaryButton extends StatelessWidget {
   final String text;
+  final double fontSize;
   final VoidCallback? onPressed;
   final bool isLoading;
 
   const PrimaryButton({
     super.key,
+    required this.fontSize,
     required this.text,
     this.onPressed,
     this.isLoading = false,
@@ -29,8 +31,8 @@ class PrimaryButton extends StatelessWidget {
             ? const CircularProgressIndicator(color: Colors.white)
             : Text(
                 text,
-                style: const TextStyle(
-                  fontSize: 17,
+                style: TextStyle(
+                  fontSize: fontSize,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),

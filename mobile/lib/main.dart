@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';                    // ← ADD THIS
+import 'package:go_router/go_router.dart';
 import 'package:mobile/core/providers/signup_provider.dart';
 import 'package:mobile/navigation/router.dart';
+
 
 void main() {
   runApp(
     ChangeNotifierProvider(
       create: (_) => SignupProvider(),
-      child: MyApp(router: appRouter),  // ← use appRouter directly, no AppRouter()
+      child: MyApp(router: appRouter), 
     ),
   );
 }
