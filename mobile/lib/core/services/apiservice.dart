@@ -6,7 +6,7 @@ enum DioMethode { get, post, put, delete }
 
 class AuthHolder {
   static String? token;
-  static int? id;
+  static String? id;
 }
 
 class Apiservice {
@@ -14,12 +14,20 @@ class Apiservice {
   static final Apiservice _instance = Apiservice._singleton();
   static Apiservice get instance => _instance;
 
-  // Replace baseUrl in your Apiservice class temporarily
-    String get baseUrl {
-      return 'https://webhook.site/0205c189-5530-4df7-9c8f-deedf13e9c03';
-    }
+  // apiservice.dart
+String get baseUrl {
+  if (kIsWeb) return 'http://localhost:8000';
+  
+  // Your correct IP address from hostname -I
+  return 'http://192.168.171.14:8000';
+}
 
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+    ),
+  );
 
   Future<Response> request(
     DioMethode methode,
@@ -28,6 +36,7 @@ class Apiservice {
     Options? options,
   }) async {
     final fullUrl = '$baseUrl$url';
+    debugPrint('>>> [API] ${methode.name.toUpperCase()} $fullUrl');
 
     if (AuthHolder.token != null) {
       _dio.options.headers['Authorization'] = 'Bearer ${AuthHolder.token}';
@@ -45,42 +54,35 @@ class Apiservice {
     }
   }
 
-  // ── Register (multipart/form-data) ─────────────────────────────────────────
-  // Sends all signup fields + optional cropped avatar as a single
-  // multipart request. Only the cropped circle image is uploaded —
-  // the original picked file is never sent.
-
   Future<Response> register(SignupData data) async {
+    final String roleStr = data.role == UserRole.member ? 'membre' : 'coach';
 
-    final formData = FormData.fromMap({
-      'first_name':   data.first_name,
-      'last_name':      data.last_name,
-      'email':    data.email,
-      'phone':    data.phone,
-      'password': data.password,
-      'role':     data.role!.name, // 'member' or 'coach'
+    final Map<String, dynamic> fields = {
+      'first_name': data.first_name,
+      'last_name':  data.last_name,
+      'email':      data.email,
+      'phone':      data.phone,
+      'password':   data.password,
+      'password2':  data.password,
+      'role':       roleStr,
+    };
 
-      if (data.role == UserRole.member)
-        ...Map.fromEntries(
-          data.goals.asMap().entries.map(
-            (e) => MapEntry('goals', e.value),
-          ),
-        ),
-      if (data.role == UserRole.coach)
-        ...Map.fromEntries(
-          data.specialties.asMap().entries.map(
-            (e) => MapEntry('specialties', e.value),
-          ),
-        ),
+    if (data.role == UserRole.member && data.goals.isNotEmpty) {
+      fields['health_goal'] = data.goals.join(', ');
+    }
 
-      // Cropped circle avatar — only included when the user picked a photo.
-      if (data.croppedImagePath != null)
-        'avatar': await MultipartFile.fromFile(
-          data.croppedImagePath!,
-          filename: 'avatar.png',
-        ),
-    });
+    if (data.role == UserRole.coach && data.specialties.isNotEmpty) {
+      fields['specialties'] = data.specialties.join(', ');
+    }
 
+    if (data.croppedImagePath != null) {
+      fields['profile_photo'] = await MultipartFile.fromFile(
+        data.croppedImagePath!,
+        filename: 'profile_photo.png',
+      );
+    }
+
+    final formData = FormData.fromMap(fields);
     return await request(
       DioMethode.post,
       '/auth/register/',
@@ -89,15 +91,11 @@ class Apiservice {
     );
   }
 
-  // ── Login ──────────────────────────────────────────────────────────────────
   Future<Response> login(String email, String password) async {
     return await request(
       DioMethode.post,
       '/auth/login/',
-      data: {
-        'email':    email,
-        'password': password,
-      },
+      data: {'email': email, 'password': password},
     );
   }
 }

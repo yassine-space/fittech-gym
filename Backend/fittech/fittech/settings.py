@@ -92,12 +92,12 @@ AUTH_USER_MODEL = "fitapi.User"
 load_dotenv()
 
 # Replace the DATABASES section of your settings.py with this
-tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
-
+database_url = os.getenv("DATABASE_URL")
+tmpPostgres = urlparse(database_url)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': tmpPostgres.path.replace('/', ''),
+        'NAME': tmpPostgres.path[1:],
         'USER': tmpPostgres.username,
         'PASSWORD': tmpPostgres.password,
         'HOST': tmpPostgres.hostname,
@@ -140,7 +140,8 @@ USE_I18N = True
 
 USE_TZ = True
 
-
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 

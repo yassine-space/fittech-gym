@@ -311,7 +311,6 @@ class _Step3MemberState extends State<Step3Member>
     super.initState();
     final provider = Provider.of<SignupProvider>(context, listen: false);
     _selectedGoals.addAll(provider.data.goals);
-    // Restore decoded image so the circle preview works after back-navigation.
     restoreImage(provider.data.croppedImagePath);
   }
 
