@@ -192,7 +192,7 @@ class _Step1State extends State<Step1> {
                 text: 'Suivant >',
                 onPressed: _handleNext,
               ),
-              const SizedBox(height: 20),   // ← ADD FROM HERE
+              const SizedBox(height: 20),   
                
                Center(
                  child: RichText(
