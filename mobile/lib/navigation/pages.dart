@@ -9,6 +9,16 @@ class Pages extends Equatable {
   static const coachDashboard = '/coache';
   static const forgotPassword = '/forgot';
   static const emailSent = '/emailsent';
+<<<<<<< HEAD
+  // pages.dart - Add these if needed
+static const coachClients = '/coach/clients';
+static const coachPrograms = '/coach/programs';
+static const coachSchedule = '/coach/schedule';
+static const coachMessages = '/coach/messages';
+static const coachProfile = '/coach/profile';
+
+=======
+>>>>>>> origin/main
   @override
   List<Object?> get props => [home, singup, login];
 }
