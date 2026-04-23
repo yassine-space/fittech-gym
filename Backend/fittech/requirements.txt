@@ -1,0 +1,13 @@
+asgiref==3.11.1
+Django==6.0.3
+django-templated-mail==1.1.1
+djangorestframework==3.17.1
+djangorestframework_simplejwt==5.5.1
+gunicorn==25.3.0
+packaging==26.1
+pillow==12.1.1
+psycopg==3.3.3
+psycopg-binary==3.3.3
+PyJWT==2.12.1
+python-dotenv==1.2.2
+sqlparse==0.5.5

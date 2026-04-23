@@ -4,7 +4,7 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 from django.utils import timezone
 from datetime import date 
-
+import secrets
 # ─────────────────────────────────────────
 # Custom User Manager
 # ─────────────────────────────────────────
@@ -59,6 +59,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(default=timezone.now)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    archived_at = models.DateTimeField(blank=True, null=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]
@@ -175,3 +176,18 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment #{self.invoice_number} - {self.membre} ({self.payment_status})"
+
+
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reset_tokens")
+    token = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    is_used = models.BooleanField(default=False)
+
+    def is_valid(self):
+        from datetime import timedelta
+        expiry = self.created_at + timedelta(hours=1)
+        return not self.is_used and timezone.now() < expiry
+
+    def __str__(self):
+        return f"Reset token for {self.user.email}"

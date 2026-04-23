@@ -1,0 +1,19 @@
+
+
+services:
+  web:
+    build: ./fittech
+    command: gunicorn fittech.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    volumes:
+      - ./fittech:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./fittech/.env
+    restart: always
+
+volumes:
+  static_volume:
+  media_volume:

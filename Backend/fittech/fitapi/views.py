@@ -4,8 +4,11 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
+from django.core.mail import send_mail
+from django.conf import settings
+import secrets
 
-from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment
+from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken
 from .serializers import (
     UserSerializer,
     RegisterSerializer,
@@ -20,6 +23,8 @@ from .serializers import (
     MembreSubscriptionCreateSerializer,
     PaymentSerializer,
     PaymentCreateSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer
 )
 
 
@@ -219,6 +224,79 @@ class ChangePasswordView(APIView):
         return Response({
             "detail": "Password updated successfully. Please log in again."
         })
+
+class ForgotPasswordView(APIView):
+    """
+    POST /auth/forgot-password/
+    Sends a password reset link to the user's email.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+
+        # always return 200 even if email doesn't exist (security best practice)
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"detail": "If this email exists you will receive a reset link."})
+
+        # invalidate old tokens
+        PasswordResetToken.objects.filter(user=user, is_used=False).update(is_used=True)
+
+        # generate new token
+        token = secrets.token_urlsafe(32)
+        PasswordResetToken.objects.create(user=user, token=token)
+
+        # build reset link
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+
+        # send email
+        send_mail(
+            subject="Reset your FitTech password",
+            message=f"Hi {user.first_name},\n\nClick the link below to reset your password:\n{reset_link}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, ignore this email.",
+            from_email=settings.EMAIL_HOST_USER,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+
+        return Response({"detail": "If this email exists you will receive a reset link."})
+
+
+class ResetPasswordView(APIView):
+    """
+    POST /auth/reset-password/
+    Validates token and sets new password.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        token_str = serializer.validated_data["token"]
+
+        try:
+            reset_token = PasswordResetToken.objects.select_related("user").get(token=token_str)
+        except PasswordResetToken.DoesNotExist:
+            return Response({"detail": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not reset_token.is_valid():
+            return Response({"detail": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = reset_token.user
+        user.set_password(serializer.validated_data["new_password"])
+        user.save()
+
+        # mark token as used
+        reset_token.is_used = True
+        reset_token.save()
+
+        return Response({"detail": "Password reset successfully. You can now log in."})
+
 
 class MeView(generics.RetrieveUpdateAPIView):
     """

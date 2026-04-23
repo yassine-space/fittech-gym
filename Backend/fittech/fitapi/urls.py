@@ -8,6 +8,8 @@ from .views import (
     LogoutView,
     ChangePasswordView,
     MeView,
+    ResetPasswordView,
+    ForgotPasswordView,
     # Users
     UserListView,
     UserDetailView,
@@ -45,7 +47,8 @@ urlpatterns = [
     path("auth/token/refresh/",     TokenRefreshView.as_view(),    name="auth-token-refresh"),
     path("auth/change-password/",   ChangePasswordView.as_view(),  name="auth-change-password"),
     path("auth/me/",                MeView.as_view(),              name="auth-me"),
-
+    path("auth/forgot-password/", ForgotPasswordView.as_view(), name="auth-forgot-password"),
+    path("auth/reset-password/",  ResetPasswordView.as_view(),  name="auth-reset-password"),
     # ─────────────────────────────────────────
     # Users  (admin only)
     # ─────────────────────────────────────────

@@ -14,7 +14,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "first_name", "last_name", "email",
-            "phone", "role", "profile_photo", "created_at", "is_active"
+            "phone", "role", "profile_photo", "created_at", "is_active","archived_at"
         ]
         read_only_fields = ["id", "created_at","role"]
 
@@ -266,3 +266,18 @@ class PaymentCreateSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError("Amount must be greater than 0.")
         return value
+    
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, validators=[validate_password])
+    new_password2 = serializers.CharField(required=True)
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["new_password2"]:
+            raise serializers.ValidationError({"new_password": "Passwords do not match."})
+        return attrs
