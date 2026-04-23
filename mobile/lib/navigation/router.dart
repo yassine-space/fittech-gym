@@ -5,11 +5,18 @@ import 'package:mobile/features/authentication/forgot.dart';
 import 'package:mobile/features/authentication/homescreen.dart' show HomeScreen;
 import 'package:mobile/features/authentication/login.dart';
 import 'package:mobile/features/authentication/signup/signup.dart';
+<<<<<<< HEAD
 import 'package:mobile/features/coach/screens/clients_screen.dart';
+=======
+>>>>>>> origin/main
 import 'package:mobile/navigation/pages.dart';
 import 'package:mobile/features/coach/screens/coach_dashboard.dart'; 
 GoRouter appRouter = GoRouter(
+<<<<<<< HEAD
   initialLocation: Pages.coachDashboard,
+=======
+  initialLocation: Pages.login,
+>>>>>>> origin/main
   routes: [
     GoRoute(
       path: Pages.home,
@@ -47,9 +54,13 @@ GoRouter appRouter = GoRouter(
     GoRoute(
       path: Pages.coachDashboard,
       name: Pages.coachDashboard,
+<<<<<<< HEAD
       builder: (context, state) => CoachDashboard(
         email: state.extra as String? ?? '',
     )
+=======
+      builder: (context, state) => HomeScreen(role: 'coach', email: state.extra as String),
+>>>>>>> origin/main
     ),
   ],
 );

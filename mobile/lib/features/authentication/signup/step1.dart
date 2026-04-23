@@ -189,6 +189,7 @@ class _Step1State extends State<Step1> {
                 fontSize: 17,
                 onPressed: _handleNext,
               ),
+<<<<<<<< HEAD:mobile/lib/features/authentication/signup/step1.dart
               const SizedBox(height: 20),
 
               Center(
@@ -215,6 +216,37 @@ class _Step1State extends State<Step1> {
                 ),
               ),
             ],
+========
+              const SizedBox(height: 20),   
+               
+               Center(
+                 child: RichText(
+                   text: TextSpan(
+                     text: 'Vous avez déjà un compte ? ',
+                     style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                     children: [
+                       WidgetSpan(
+                         child: GestureDetector(
+                           onTap: () {
+                              // Navigate to login page
+                              context.push(Pages.login);
+                           },
+                           child: Text(
+                             'Se connecter',
+                             style: TextStyle(
+                               color: Color(0xFFE50000),
+                               fontWeight: FontWeight.w600,
+                               fontSize: 14,
+                             ),
+                           ),
+                         ),
+                       ),
+                     ],
+                   ),
+                 ),
+               ),
+           ],
+>>>>>>>> origin/main:mobile/lib/features/authentication/interface/signup/step1.dart
           ),
         ),
       ),
