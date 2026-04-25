@@ -27,8 +27,8 @@ load_dotenv()
 
 # SECURITY WARNING: don't run with debug turned on in production!
 
-
-DEBUG = os.getenv("DEBUG", "False") == "True"
+DEBUG =True
+#DEBUG = os.getenv("DEBUG", "False") == "True"
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
@@ -160,5 +160,5 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'fittech@gmail.com'
 EMAIL_HOST_PASSWORD = 'hvci lqya cxcu ajfg'  # Gmail app password not your real password
-FRONTEND_URL = 'http://localhost:3000'  
+FRONTEND_URL = 'http://localhost:4200'  
 
