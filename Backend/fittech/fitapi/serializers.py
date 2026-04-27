@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment
+from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist
 
 
 # ─────────────────────────────────────────
@@ -281,3 +281,61 @@ class ResetPasswordSerializer(serializers.Serializer):
         if attrs["new_password"] != attrs["new_password2"]:
             raise serializers.ValidationError({"new_password": "Passwords do not match."})
         return attrs
+    
+class CourseSerializer(serializers.ModelSerializer):
+    spots_remaining = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Course
+        fields = [
+            "id", "coach", "title", "description", "level_required",
+            "max_participants", "duration_minutes", "date_time",
+            "created_at", "spots_remaining",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+    def get_spots_remaining(self, obj):
+        confirmed = obj.reservations.filter(reservation_status="confirmed").count()
+        return max(0, obj.max_participants - confirmed)
+
+
+class CourseReservationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseReservation
+        fields = ["id", "course", "membre", "reservation_status", "reservation_date"]
+        read_only_fields = ["id", "reservation_date"]
+
+    def validate(self, data):
+        course = data["course"]
+        membre = data.get("membre")
+
+        # Check for duplicate reservation
+        if CourseReservation.objects.filter(course=course, membre=membre).exists():
+            raise serializers.ValidationError("This membre already has a reservation for this course.")
+
+        # Check capacity
+        confirmed_count = course.reservations.filter(reservation_status="confirmed").count()
+        if confirmed_count >= course.max_participants:
+            raise serializers.ValidationError(
+                "Course is full. The membre should be added to the waitlist."
+            )
+
+        return data
+
+
+class CourseWaitlistSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseWaitlist
+        fields = ["id", "course", "membre", "position", "created_at"]
+        read_only_fields = ["id", "position", "created_at"]
+
+    def validate(self, data):
+        if CourseWaitlist.objects.filter(course=data["course"], membre=data["membre"]).exists():
+            raise serializers.ValidationError("This membre is already on the waitlist.")
+        return data
+
+    def create(self, validated_data):
+        course = validated_data["course"]
+        last_position = CourseWaitlist.objects.filter(course=course).count()
+        validated_data["position"] = last_position + 1
+        return super().create(validated_data)

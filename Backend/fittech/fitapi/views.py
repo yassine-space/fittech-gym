@@ -8,7 +8,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 import secrets
 
-from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken
+from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist
 from .serializers import (
     UserSerializer,
     RegisterSerializer,
@@ -24,9 +24,12 @@ from .serializers import (
     PaymentSerializer,
     PaymentCreateSerializer,
     ForgotPasswordSerializer,
-    ResetPasswordSerializer
+    ResetPasswordSerializer,
+    CourseSerializer, 
+    CourseReservationSerializer, 
+    CourseWaitlistSerializer
 )
-
+from django.db import transaction
 
 # ─────────────────────────────────────────
 # Permissions
@@ -550,3 +553,93 @@ class MyPaymentsView(generics.ListAPIView):
         return Payment.objects.select_related("membre__user", "subscription__plan").filter(
             membre__user=self.request.user
         )
+    
+
+class CourseListCreateView(generics.ListCreateAPIView):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAdminOrCoach()]
+        return [permissions.IsAuthenticated()]
+
+
+class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.IsAuthenticated()]
+        return [IsAdminOrCoach()]
+
+
+class CourseReservationListCreateView(generics.ListCreateAPIView):
+    serializer_class = CourseReservationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.role == "admin":
+            return CourseReservation.objects.all()
+        return CourseReservation.objects.filter(membre__user=self.request.user)
+
+
+class CourseReservationDetailView(generics.RetrieveUpdateAPIView):
+    queryset = CourseReservation.objects.all()
+    serializer_class = CourseReservationSerializer
+    permission_classes = [IsOwnerOrAdmin]
+
+
+class CancelReservationView(APIView):
+    """
+    PATCH /reservations/<pk>/cancel/
+    Cancels a reservation and promotes the first waitlist entry.
+    """
+    permission_classes = [IsOwnerOrAdmin]
+
+    def patch(self, request, pk):
+        reservation = get_object_or_404(CourseReservation, pk=pk)
+
+        with transaction.atomic():
+            reservation.reservation_status = "cancelled"
+            reservation.save()
+
+            # Promote next person from waitlist
+            next_entry = (
+                CourseWaitlist.objects.filter(course=reservation.course)
+                .order_by("position")
+                .first()
+            )
+            if next_entry:
+                CourseReservation.objects.create(
+                    course=reservation.course,
+                    membre=next_entry.membre,
+                    reservation_status="confirmed",
+                )
+                next_entry.delete()
+                # Re-number remaining waitlist positions
+                for i, entry in enumerate(
+                    CourseWaitlist.objects.filter(course=reservation.course).order_by("position"),
+                    start=1,
+                ):
+                    entry.position = i
+                    entry.save()
+
+        return Response({"detail": "Reservation cancelled."})
+
+
+class CourseWaitlistListCreateView(generics.ListCreateAPIView):
+    serializer_class = CourseWaitlistSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.role == "admin":
+            return CourseWaitlist.objects.all()
+        return CourseWaitlist.objects.filter(membre__user=self.request.user)
+
+
+class CourseWaitlistDetailView(generics.RetrieveDestroyAPIView):
+    queryset = CourseWaitlist.objects.all()
+    serializer_class = CourseWaitlistSerializer
+    permission_classes = [IsOwnerOrAdmin]

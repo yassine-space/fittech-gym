@@ -191,3 +191,60 @@ class PasswordResetToken(models.Model):
 
     def __str__(self):
         return f"Reset token for {self.user.email}"
+    
+
+class Course(models.Model):
+    LEVEL_CHOICES = [
+        ("beginner", "Beginner"),
+        ("intermediate", "Intermediate"),
+        ("advanced", "Advanced"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coach = models.ForeignKey("Coach", on_delete=models.CASCADE, related_name="courses")
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    level_required = models.CharField(max_length=20, choices=LEVEL_CHOICES, default="beginner")
+    max_participants = models.PositiveIntegerField()
+    duration_minutes = models.PositiveIntegerField()
+    date_time = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+
+class CourseReservation(models.Model):
+    STATUS_CHOICES = [
+        ("confirmed", "Confirmed"),
+        ("cancelled", "Cancelled"),
+        ("attended", "Attended"),
+        ("no_show", "No Show"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="reservations")
+    membre = models.ForeignKey("Membre", on_delete=models.CASCADE, related_name="reservations")
+    reservation_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="confirmed")
+    reservation_date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("course", "membre")  # one reservation per membre per course
+
+    def __str__(self):
+        return f"{self.membre} → {self.course}"
+
+
+class CourseWaitlist(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="waitlist")
+    membre = models.ForeignKey("Membre", on_delete=models.CASCADE, related_name="waitlist_entries")
+    position = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("course", "membre")
+        ordering = ["position"]
+
+    def __str__(self):
+        return f"{self.membre} waiting #{self.position} for {self.course}"

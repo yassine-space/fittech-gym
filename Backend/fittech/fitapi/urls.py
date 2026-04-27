@@ -34,6 +34,10 @@ from .views import (
     PaymentListCreateView,
     PaymentDetailView,
     MyPaymentsView,
+    #Courses
+    CourseListCreateView, CourseDetailView,
+    CourseReservationListCreateView, CourseReservationDetailView, CancelReservationView,
+    CourseWaitlistListCreateView, CourseWaitlistDetailView,
 )
 
 urlpatterns = [
@@ -90,4 +94,16 @@ urlpatterns = [
     path("payments/",               PaymentListCreateView.as_view(),  name="payment-list"),
     path("payments/me/",            MyPaymentsView.as_view(),         name="payment-me"),
     path("payments/<uuid:pk>/",     PaymentDetailView.as_view(),      name="payment-detail"),
+    # Courses
+    path("courses/", CourseListCreateView.as_view()),
+    path("courses/<uuid:pk>/", CourseDetailView.as_view()),
+
+    # Reservations
+    path("reservations/", CourseReservationListCreateView.as_view()),
+    path("reservations/<uuid:pk>/", CourseReservationDetailView.as_view()),
+    path("reservations/<uuid:pk>/cancel/", CancelReservationView.as_view()),
+
+    # Waitlist
+    path("waitlist/", CourseWaitlistListCreateView.as_view()),
+    path("waitlist/<uuid:pk>/", CourseWaitlistDetailView.as_view()),
 ]
