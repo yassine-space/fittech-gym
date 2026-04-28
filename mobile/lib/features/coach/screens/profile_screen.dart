@@ -401,7 +401,7 @@ class _SettingsItem extends StatelessWidget {
 }
 
 class _DangerZone extends StatelessWidget {
-   _DangerZone();
+   const _DangerZone();
 
   @override
   Widget build(BuildContext context) {

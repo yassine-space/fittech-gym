@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For haptic feedback
-// --- KEEP YOUR ORIGINAL IMPORTS ---
+import 'package:flutter/services.dart';
+
 import 'clients_screen.dart';
 import 'programs_screen.dart';
-import 'schedule_screen.dart';
+import 'courses_screen.dart';
 import 'messages_screen.dart';
 import 'profile_screen.dart';
 
@@ -18,40 +18,47 @@ class CoachDashboard extends StatefulWidget {
 class _CoachDashboardState extends State<CoachDashboard> {
   int _selectedIndex = 0;
 
-  // --- RESTORED YOUR ACTUAL SCREENS ---
-  final List<Widget> _screens = [
-    const ClientsScreen(),
-    const ProgramsScreen(),
-    const ScheduleScreen(),
-    const MessagesScreen(),
-    const ProfileScreen(),
-  ];
+  // Mock screens for demonstration - replace these with your actual imported widgets
+   final List<Widget> _screens = [
+
+const ClientsScreen(),
+
+const ProgramsScreen(),
+
+CoursesScreen(token: "myJwtToken", userRole: 'membre'),
+
+const MessagesScreen(),
+
+const ProfileScreen(),
+
+]; 
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack( // Using IndexedStack preserves the state of your pages
+      body: IndexedStack(
         index: _selectedIndex,
         children: _screens,
       ),
       bottomNavigationBar: Container(
-        height: 85, 
+        height: 100, // Adjusted height to match the photo's spacing
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.04),
               blurRadius: 10,
-              offset: const Offset(0, -5),
+              offset: const Offset(0, -2),
             ),
           ],
         ),
         child: SafeArea(
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(Icons.people_alt_rounded, 'CLIENTS', 0),
               _buildNavItem(Icons.fitness_center_rounded, 'PROGRAMS', 1),
-              _buildNavItem(Icons.calendar_month_rounded, 'SCHEDULE', 2),
+              _buildNavItem(Icons.menu_book_rounded, 'COURSES', 2),
               _buildNavItem(Icons.chat_bubble_rounded, 'MESSAGES', 3),
               _buildNavItem(Icons.person_rounded, 'PROFILE', 4),
             ],
@@ -63,56 +70,47 @@ class _CoachDashboardState extends State<CoachDashboard> {
 
   Widget _buildNavItem(IconData icon, String label, int index) {
     final isSelected = _selectedIndex == index;
-    const activeColor = Color(0xFFD44820);
-    const inactiveColor = Color(0xFFB09080);
+
+    // Color Palette based on your image
+    const activeColor = Color(0xFFD45E36);      // Darker peach/orange
+    const activeBgColor = Color(0xFFFDECE7);    // Very light peach circle
+    const inactiveColor = Color(0xFFAC9181);    // Muted brownish-grey
 
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
-          HapticFeedback.selectionClick(); // Adds a nice physical feel
+          HapticFeedback.selectionClick();
           setState(() => _selectedIndex = index);
         },
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Indicator bar that slides/fades in
+            // Circular highlight
             AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              margin: const EdgeInsets.only(bottom: 4),
-              height: 4,
-              width: isSelected ? 18 : 0,
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(12), // Adjust padding for circle size
               decoration: BoxDecoration(
-                color: activeColor,
-                borderRadius: BorderRadius.circular(2),
+                color: isSelected ? activeBgColor : Colors.transparent,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 26,
+                color: isSelected ? activeColor : inactiveColor,
               ),
             ),
-            // Scaled Icon
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 1.0, end: isSelected ? 1.2 : 1.0),
-              duration: const Duration(milliseconds: 200),
-              builder: (context, scale, child) {
-                return Transform.scale(
-                  scale: scale,
-                  child: Icon(
-                    icon,
-                    size: 24,
-                    color: isSelected ? activeColor : inactiveColor,
-                  ),
-                );
-              },
-            ),
             const SizedBox(height: 4),
-            // Smooth text transition
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
+            // Text Label
+            Text(
+              label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                 color: isSelected ? activeColor : inactiveColor,
                 letterSpacing: 0.5,
               ),
-              child: Text(label),
             ),
           ],
         ),
