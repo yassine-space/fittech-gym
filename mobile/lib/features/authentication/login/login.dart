@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/navigation/pages.dart';
-const String _baseUrl = 'http://192.168.171.14:8000';
+import 'package:mobile/core/services/apiservice.dart';
+import 'package:dio/dio.dart';
+const String _baseUrl = 'http://127.0.0.1:8000';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -217,71 +218,87 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _handleLogin() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
 
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Remplis tous les champs')),
-      );
-      return;
-    }
+void _handleLogin() async {
+  final email = _emailController.text.trim();
+  final password = _passwordController.text;
 
-    setState(() => _isLoading = true);
-
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/auth/login/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
-      );
-
-      final data = jsonDecode(response.body);
-      if (!mounted) return;
-
-      if (response.statusCode == 200) {
-       debugPrint('✅ LOGIN OK - role: ${data['user']['role']}');
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', data['access']);
-        await prefs.setString('refresh_token', data['refresh']);
-        await prefs.setString('user_role', data['user']['role']);
-
-        final role = data['user']['role'];
-        if (!mounted) return;
-
-        switch (role) {
-  case 'membre':
-    context.go(Pages.membreDashboard, extra: email);
-    break;
-  case 'coach':
-    context.go(Pages.coachDashboard, extra: email);
-    break;
-
-  default:
+  if (email.isEmpty || password.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Role inconnu: $role')),
+      const SnackBar(content: Text('Remplis tous les champs')),
     );
-}
-      } else if (response.statusCode == 403) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['detail'] ?? 'Accès refusé'), backgroundColor: Colors.orange),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['detail'] ?? 'Erreur de connexion'), backgroundColor: primaryRed),
-        );
-      }
-    } catch (e) {
-    debugPrint('❌ ERROR: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible de joindre le serveur')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    return;
   }
+
+  setState(() => _isLoading = true);
+
+  try {
+    // Use Apiservice instead of direct http call
+    final response = await Apiservice.instance.login(email, password);
+
+    if (!mounted) return;
+
+    if (response.statusCode == 200) {
+      final data = response.data;
+      debugPrint('✅ LOGIN OK - role: ${data['user']['role']}');
+
+      // Persist auth data and set AuthHolder for Dio-based API calls
+      await Apiservice.instance.saveAuthData(
+        accessToken: data['access'],
+        refreshToken: data['refresh'],
+        userId: data['user']['id'],
+        userRole: data['user']['role'],
+      );
+
+      final role = data['user']['role'];
+      if (!mounted) return;
+
+      switch (role) {
+        case 'membre':
+          context.go(Pages.membreDashboard, extra: email);
+          break;
+        case 'coach':
+          context.go(Pages.coachDashboard, extra: email);
+          break;
+        default:
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Role inconnu: $role')),
+          );
+      }
+    }
+  } on DioException catch (e) {
+    debugPrint('❌ ERROR: $e');
+    if (!mounted) return;
+    
+    String errorMessage = 'Erreur de connexion';
+    if (e.response?.statusCode == 403) {
+      errorMessage = e.response?.data?['detail'] ?? 'Accès refusé';
+    } else if (e.response?.statusCode == 401) {
+      errorMessage = 'Email ou mot de passe incorrect';
+    } else if (e.response?.data?['detail'] != null) {
+      errorMessage = e.response!.data['detail'];
+    } else if (e.type == DioExceptionType.connectionTimeout || 
+               e.type == DioExceptionType.connectionError) {
+      errorMessage = 'Impossible de joindre le serveur';
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(errorMessage),
+        backgroundColor: primaryRed,
+      ),
+    );
+  } catch (e) {
+    debugPrint('❌ ERROR: $e');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Impossible de joindre le serveur')),
+    );
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
+}
+
 
   void _handleForgotPassword() {
 context.go(Pages.forgotPassword);

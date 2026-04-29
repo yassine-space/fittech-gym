@@ -1,182 +1,267 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mobile/core/providers/coach_provider.dart';
+import 'package:mobile/core/models/coach_profile_model.dart';
+import 'package:mobile/navigation/pages.dart';
+
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return  Scaffold(
-      backgroundColor: Color(0xFFF5EDE8),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
+    return Consumer<CoachProvider>(
+      builder: (context, provider, _) {
+        if (provider.profileLoading && provider.profile == null) {
+          return const Scaffold(
+            backgroundColor: Color(0xFFF5EDE8),
+            body: Center(child: CircularProgressIndicator(color: Color(0xFFD44820))),
+          );
+        }
+
+        if (provider.profileError != null && provider.profile == null) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF5EDE8),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: Color(0xFF8B4513),
-                    child: Icon(Icons.person, color: Colors.white, size: 18),
+                  const Icon(Icons.error_outline, size: 48, color: Color(0xFFD44820)),
+                  const SizedBox(height: 12),
+                  const Text('Failed to load profile', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () => provider.loadProfile(),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD44820)),
+                    child: const Text('Retry', style: TextStyle(color: Colors.white)),
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    'PERFORMANCE LAB',
+                ],
+              ),
+            ),
+          );
+        }
+
+        final profile = provider.profile;
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF5EDE8),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: const Color(0xFF8B4513),
+                        child: const Icon(Icons.person, color: Colors.white, size: 18),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'PERFORMANCE LAB',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFD44820),
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.notifications_none, color: Color(0xFF1C1C1C), size: 24),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Profile Title
+                  const Text(
+                    'PROFILE',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 32,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFFD44820),
-                      letterSpacing: 1.2,
+                      color: Color(0xFF1C1C1C),
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  Spacer(),
-                  Icon(Icons.notifications_none, color: Color(0xFF1C1C1C), size: 24),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Manage your account settings and preferences.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF9A7060),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Profile Card — dynamic data
+                  _ProfileCard(profile: profile),
+                  const SizedBox(height: 20),
+
+                  // Account Settings
+                  _SettingsSection(
+                    title: 'ACCOUNT SETTINGS',
+                    items: [
+                      _SettingsItem(
+                        icon: Icons.person_outline,
+                        title: 'Personal Information',
+                        subtitle: profile != null
+                            ? '${profile.user.fullName} · ${profile.user.email}'
+                            : 'Name, email, phone number',
+                      ),
+                      const _SettingsItem(
+                        icon: Icons.lock_outline,
+                        title: 'Security',
+                        subtitle: 'Password, two-factor authentication',
+                      ),
+                      const _SettingsItem(
+                        icon: Icons.notifications_outlined,
+                        title: 'Notifications',
+                        subtitle: 'Push notifications, email alerts',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Coach Info
+                  if (profile != null)
+                    _SettingsSection(
+                      title: 'COACH DETAILS',
+                      items: [
+                        _SettingsItem(
+                          icon: Icons.star_outline,
+                          title: 'Specialties',
+                          subtitle: profile.specialties?.isNotEmpty == true
+                              ? profile.specialties!
+                              : 'Not set',
+                        ),
+                        _SettingsItem(
+                          icon: Icons.info_outline,
+                          title: 'Biography',
+                          subtitle: profile.biography?.isNotEmpty == true
+                              ? profile.biography!
+                              : 'Not set',
+                        ),
+                        _SettingsItem(
+                          icon: Icons.timeline,
+                          title: 'Experience',
+                          subtitle: '${profile.yearsOfExperience} years',
+                        ),
+                      ],
+                    ),
+                  if (profile != null) const SizedBox(height: 20),
+
+                  // Preferences
+                  const _SettingsSection(
+                    title: 'PREFERENCES',
+                    items: [
+                      _SettingsItem(
+                        icon: Icons.language_outlined,
+                        title: 'Language',
+                        subtitle: 'English',
+                        trailing: 'EN',
+                      ),
+                      _SettingsItem(
+                        icon: Icons.attach_money,
+                        title: 'Currency',
+                        subtitle: 'USD - US Dollar',
+                        trailing: '\$',
+                      ),
+                      _SettingsItem(
+                        icon: Icons.calendar_today_outlined,
+                        title: 'Time Zone',
+                        subtitle: 'Eastern Time (ET)',
+                        trailing: 'ET',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Support
+                  const _SettingsSection(
+                    title: 'SUPPORT',
+                    items: [
+                      _SettingsItem(
+                        icon: Icons.help_outline,
+                        title: 'Help Center',
+                        subtitle: 'FAQs and guides',
+                      ),
+                      _SettingsItem(
+                        icon: Icons.email_outlined,
+                        title: 'Contact Support',
+                        subtitle: 'Get help from our team',
+                      ),
+                      _SettingsItem(
+                        icon: Icons.description_outlined,
+                        title: 'Terms & Privacy',
+                        subtitle: 'Legal information',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Danger Zone
+                  _DangerZone(
+                    onSignOut: () => _handleSignOut(context, provider),
+                  ),
+                  const SizedBox(height: 30),
                 ],
               ),
-              SizedBox(height: 24),
-
-              // Profile Title
-              Text(
-                'PROFILE',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1C1C1C),
-                  letterSpacing: -0.5,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Manage your account settings and preferences.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF9A7060),
-                  height: 1.4,
-                ),
-              ),
-              SizedBox(height: 24),
-
-              // Profile Card
-              _ProfileCard(),
-              SizedBox(height: 20),
-
-              // Account Settings
-              _SettingsSection(
-                title: 'ACCOUNT SETTINGS',
-                items: [
-                  _SettingsItem(
-                    icon: Icons.person_outline,
-                    title: 'Personal Information',
-                    subtitle: 'Name, email, phone number',
-                  ),
-                  _SettingsItem(
-                    icon: Icons.lock_outline,
-                    title: 'Security',
-                    subtitle: 'Password, two-factor authentication',
-                  ),
-                  _SettingsItem(
-                    icon: Icons.notifications_outlined,
-                    title: 'Notifications',
-                    subtitle: 'Push notifications, email alerts',
-                  ),
-                ],
-              ),
-              SizedBox(height: 20),
-
-              // Preferences
-              _SettingsSection(
-                title: 'PREFERENCES',
-                items: [
-                  _SettingsItem(
-                    icon: Icons.language_outlined,
-                    title: 'Language',
-                    subtitle: 'English',
-                    trailing: 'EN',
-                  ),
-                  _SettingsItem(
-                    icon: Icons.attach_money,
-                    title: 'Currency',
-                    subtitle: 'USD - US Dollar',
-                    trailing: '\$',
-                  ),
-                  _SettingsItem(
-                    icon: Icons.calendar_today_outlined,
-                    title: 'Time Zone',
-                    subtitle: 'Eastern Time (ET)',
-                    trailing: 'ET',
-                  ),
-                ],
-              ),
-              SizedBox(height: 20),
-
-              // Billing & Subscription
-              _SettingsSection(
-                title: 'BILLING & SUBSCRIPTION',
-                items: [
-                  _SettingsItem(
-                    icon: Icons.credit_card_outlined,
-                    title: 'Payment Methods',
-                    subtitle: 'Visa •••• 4242',
-                    trailing: 'Add',
-                  ),
-                  _SettingsItem(
-                    icon: Icons.receipt_outlined,
-                    title: 'Billing History',
-                    subtitle: 'View past invoices',
-                    trailing: '→',
-                  ),
-                  _SettingsItem(
-                    icon: Icons.workspace_premium,
-                    title: 'Subscription',
-                    subtitle: 'Pro Plan • Annual',
-                    trailing: 'Active',
-                    trailingColor: Color(0xFF3DB87A),
-                  ),
-                ],
-              ),
-              SizedBox(height: 20),
-
-              // Support
-              _SettingsSection(
-                title: 'SUPPORT',
-                items: [
-                  _SettingsItem(
-                    icon: Icons.help_outline,
-                    title: 'Help Center',
-                    subtitle: 'FAQs and guides',
-                  ),
-                  _SettingsItem(
-                    icon: Icons.email_outlined,
-                    title: 'Contact Support',
-                    subtitle: 'Get help from our team',
-                  ),
-                  _SettingsItem(
-                    icon: Icons.description_outlined,
-                    title: 'Terms & Privacy',
-                    subtitle: 'Legal information',
-                  ),
-                ],
-              ),
-              SizedBox(height: 20),
-
-              // Danger Zone
-              _DangerZone(),
-              SizedBox(height: 30),
-            ],
+            ),
           ),
-        ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleSignOut(BuildContext context, CoachProvider provider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF9A7060))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD44820),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
       ),
     );
+
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+
+    await provider.logout();
+    if (!context.mounted) return;
+    context.go(Pages.login);
   }
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard();
+  final CoachProfile? profile;
+  const _ProfileCard({this.profile});
 
   @override
   Widget build(BuildContext context) {
+    final name = profile?.user.fullName ?? 'Coach';
+    final email = profile?.user.email ?? '';
+    final initials = profile?.user.initials ?? 'CO';
+    final specialties = profile?.specialtiesList ?? [];
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -197,15 +282,33 @@ class _ProfileCard extends StatelessWidget {
               ),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Center(
-              child: Text(
-                'JD',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
+            child: Center(
+              child: profile?.user.profilePhoto != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.network(
+                        profile!.user.profilePhoto!,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Text(
+                          initials,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Text(
+                      initials,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: 16),
@@ -214,9 +317,9 @@ class _ProfileCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'John Davis',
-                  style: TextStyle(
+                Text(
+                  name,
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF1C1C1C),
@@ -224,35 +327,62 @@ class _ProfileCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'john.davis@performancelab.com',
+                  email,
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF9A7060),
                   ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD44820).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.verified, size: 12, color: Color(0xFFD44820)),
-                      SizedBox(width: 4),
-                      Text(
-                        'Head Coach',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFD44820),
+                if (specialties.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD44820).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.verified, size: 12, color: Color(0xFFD44820)),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            specialties.first,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFD44820),
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD44820).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified, size: 12, color: Color(0xFFD44820)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Coach',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFD44820),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -322,12 +452,12 @@ class _SettingsItem extends StatelessWidget {
   final Color? trailingColor;
 
   const _SettingsItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.trailing,
-    this.trailingColor,
-  });
+  required this.icon,
+  required this.title,
+  required this.subtitle,
+  this.trailingColor,
+  this.trailing,
+});
 
   @override
   Widget build(BuildContext context) {
@@ -364,6 +494,8 @@ class _SettingsItem extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 11,
                         color: Color(0xFF9A7060),
@@ -401,7 +533,8 @@ class _SettingsItem extends StatelessWidget {
 }
 
 class _DangerZone extends StatelessWidget {
-   const _DangerZone();
+  final VoidCallback onSignOut;
+  const _DangerZone({required this.onSignOut});
 
   @override
   Widget build(BuildContext context) {
@@ -429,22 +562,22 @@ class _DangerZone extends StatelessWidget {
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () {},
+                  onTap: onSignOut,
                   borderRadius: BorderRadius.circular(16),
-                  child:  Padding(
-                    padding: EdgeInsets.all(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
                         Container(
-                          padding: EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Color(0xFFFFEBE8),
+                            color: const Color(0xFFFFEBE8),
                             borderRadius: BorderRadius.all(Radius.circular(10)),
                           ),
-                          child: Icon(Icons.logout, size: 20, color: Color(0xFFD44820)),
+                          child: const Icon(Icons.logout, size: 20, color: Color(0xFFD44820)),
                         ),
-                        SizedBox(width: 14),
-                        Expanded(
+                        const SizedBox(width: 14),
+                        const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -467,7 +600,7 @@ class _DangerZone extends StatelessWidget {
                             ],
                           ),
                         ),
-                        Icon(Icons.logout, size: 18, color: Color(0xFFD44820)),
+                        const Icon(Icons.logout, size: 18, color: Color(0xFFD44820)),
                       ],
                     ),
                   ),
@@ -479,17 +612,19 @@ class _DangerZone extends StatelessWidget {
                 child: InkWell(
                   onTap: () {},
                   borderRadius: BorderRadius.circular(16),
-                  child:  Padding(
+                  child: const Padding(
                     padding: EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Container(
-                          padding: EdgeInsets.all(8),
+                        DecoratedBox(
                           decoration: BoxDecoration(
                             color: Color(0xFFFFEBE8),
                             borderRadius: BorderRadius.all(Radius.circular(10)),
                           ),
-                          child: Icon(Icons.delete_outline, size: 20, color: Color(0xFFD44820)),
+                          child: Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(Icons.delete_outline, size: 20, color: Color(0xFFD44820)),
+                          ),
                         ),
                         SizedBox(width: 14),
                         Expanded(
