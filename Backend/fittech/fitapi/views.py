@@ -8,7 +8,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 import secrets
 
-from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist
+from .models import CoachCertificate, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview
 from .serializers import (
     UserSerializer,
     RegisterSerializer,
@@ -27,7 +27,9 @@ from .serializers import (
     ResetPasswordSerializer,
     CourseSerializer, 
     CourseReservationSerializer, 
-    CourseWaitlistSerializer
+    CourseWaitlistSerializer,
+    CoachReviewSerializer,
+    CoachCertificateSerializer,
 )
 from django.db import transaction
 
@@ -447,6 +449,49 @@ class PendingCoachListView(generics.ListAPIView):
         return Coach.objects.select_related("user").filter(is_active=False)
 
 
+class CoachReviewListCreateView(generics.ListCreateAPIView):
+    serializer_class = CoachReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return CoachReview.objects.filter(coach=self.kwargs["coach_pk"])
+
+
+class CoachReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = CoachReviewSerializer
+    permission_classes = [IsOwnerOrAdmin]
+
+    def get_queryset(self):
+        return CoachReview.objects.filter(coach=self.kwargs["coach_pk"])
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.IsAuthenticated()]
+        return [IsOwnerOrAdmin()]
+
+
+class CoachCertificateListCreateView(generics.ListCreateAPIView):
+    serializer_class = CoachCertificateSerializer
+
+    def get_queryset(self):
+        return CoachCertificate.objects.filter(coach=self.kwargs["coach_pk"])
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.IsAuthenticated()]
+        return [IsCoach()]
+
+
+class CoachCertificateDetailView(generics.RetrieveDestroyAPIView):
+    serializer_class = CoachCertificateSerializer
+
+    def get_queryset(self):
+        return CoachCertificate.objects.filter(coach=self.kwargs["coach_pk"])
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.IsAuthenticated()]
+        return [IsCoach()]
 # ─────────────────────────────────────────
 # Subscription Plan Views
 # ─────────────────────────────────────────
@@ -554,7 +599,7 @@ class MyPaymentsView(generics.ListAPIView):
             membre__user=self.request.user
         )
     
-
+# Course Views
 class CourseListCreateView(generics.ListCreateAPIView):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer

@@ -3,6 +3,10 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
     # Auth
+    CoachReviewDetailView,
+    CoachReviewListCreateView,
+    CoachCertificateListCreateView,
+    CoachCertificateDetailView,
     RegisterView,
     LoginView,
     LogoutView,
@@ -74,6 +78,10 @@ urlpatterns = [
     path("coaches/<uuid:pk>/",      CoachDetailView.as_view(),      name="coach-detail"),
     path("coaches/<uuid:pk>/activate/", CoachActivateView.as_view(), name="coach-activate"),
     path("coaches/pending/",        PendingCoachListView.as_view(), name="coach-pending"),
+    path("coaches/<uuid:coach_pk>/reviews/", CoachReviewListCreateView.as_view()),
+    path("coaches/<uuid:coach_pk>/reviews/<uuid:pk>/", CoachReviewDetailView.as_view()),
+    path("coaches/<uuid:coach_pk>/certificates/", CoachCertificateListCreateView.as_view()),
+    path("coaches/<uuid:coach_pk>/certificates/<uuid:pk>/", CoachCertificateDetailView.as_view()),
 
     # ─────────────────────────────────────────
     # Subscription Plans

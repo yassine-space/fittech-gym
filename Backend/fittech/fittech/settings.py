@@ -51,9 +51,11 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     "fitapi",
     "rest_framework_simplejwt.token_blacklist",
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -162,3 +164,4 @@ EMAIL_HOST_USER = 'fittech@gmail.com'
 EMAIL_HOST_PASSWORD = 'hvci lqya cxcu ajfg'  # Gmail app password not your real password
 FRONTEND_URL = 'http://localhost:4200'  
 
+CORS_ALLOW_ALL_ORIGINS = True
