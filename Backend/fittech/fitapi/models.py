@@ -5,6 +5,7 @@ from django.db import models
 from django.utils import timezone
 from datetime import date 
 import secrets
+from django.core.validators import MinValueValidator, MaxValueValidator
 # ─────────────────────────────────────────
 # Custom User Manager
 # ─────────────────────────────────────────
@@ -248,3 +249,35 @@ class CourseWaitlist(models.Model):
 
     def __str__(self):
         return f"{self.membre} waiting #{self.position} for {self.course}"
+    
+
+
+class CoachReview(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coach = models.ForeignKey("Coach", on_delete=models.CASCADE, related_name="reviews")
+    membre = models.ForeignKey("Membre", on_delete=models.CASCADE, related_name="reviews")
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("coach", "membre")
+
+    def __str__(self):
+        return f"{self.membre} → {self.coach} ({self.rating}★)"
+
+
+class CoachCertificate(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coach = models.ForeignKey("Coach", on_delete=models.CASCADE, related_name="certificates")
+    title = models.CharField(max_length=255)
+    issuing_organization = models.CharField(max_length=255)
+    issue_date = models.DateField()
+    file = models.FileField(upload_to="certificates/")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} — {self.coach}"

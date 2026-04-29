@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist
+from .models import CoachCertificate, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview
 
 
 # ─────────────────────────────────────────
@@ -183,6 +183,36 @@ class CoachActivateSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+class CoachReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoachReview
+        fields = ["id", "coach", "membre", "rating", "comment", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, data):
+        membre = data["membre"]
+        coach = data["coach"]
+
+        # Check the membre attended at least one course with this coach
+        attended = CourseReservation.objects.filter(
+            membre=membre,
+            course__coach=coach,
+            reservation_status="attended",
+        ).exists()
+
+        if not attended:
+            raise serializers.ValidationError(
+                "You can only review a coach after attending one of their courses."
+            )
+
+        return data
+
+
+class CoachCertificateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoachCertificate
+        fields = ["id", "coach", "title", "issuing_organization", "issue_date", "file", "created_at"]
+        read_only_fields = ["id", "created_at"]
 # ─────────────────────────────────────────
 # Subscription Plan Serializers
 # ─────────────────────────────────────────
