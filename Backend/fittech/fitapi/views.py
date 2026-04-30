@@ -1,6 +1,6 @@
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
-from rest_framework.views import APIView
+from rest_framework.views import APIView, PermissionDenied
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
@@ -342,7 +342,20 @@ class MembreListCreateView(generics.ListCreateAPIView):
     GET  /membres/   — list all membres (admin/coach)
     POST /membres/   — create a membre profile (admin)
     """
-    queryset = Membre.objects.select_related("user").all()
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.role == "admin":
+            return Membre.objects.select_related("user").all()
+
+        if user.role == "coach":
+            coach = user.coach_profile
+            membre_ids = CourseReservation.objects.filter(
+                course__coach=coach,
+            ).values_list("membre_id", flat=True).distinct()
+            return Membre.objects.select_related("user").filter(id__in=membre_ids)
+
+        return Membre.objects.none()
 
     def get_serializer_class(self):
         return MembreCreateSerializer if self.request.method == "POST" else MembreSerializer
@@ -533,6 +546,13 @@ class MembreSubscriptionListCreateView(generics.ListCreateAPIView):
 
     def get_permissions(self):
         return [IsAdmin()] if self.request.method == "POST" else [permissions.IsAuthenticated()]
+    
+    def perform_create(self, serializer):
+        subscription = serializer.save()
+        # reset coach assignment on new subscription
+        membre = subscription.membre
+        membre.coach = None
+        membre.save()
 
 
 class MembreSubscriptionDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -556,7 +576,48 @@ class MySubscriptionsView(generics.ListAPIView):
             membre__user=self.request.user
         )
 
+class AssignCoachView(APIView):
+    """
+    POST /membres/me/assign-coach/   — assign a coach
+    DELETE /membres/me/assign-coach/ — unassign (on plan renewal)
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
+    def _get_membre_and_validate_plan(self, request):
+        membre = get_object_or_404(Membre, user=request.user)
+
+        active_sub = MembreSubscription.objects.filter(
+            membre=membre,
+            status="active",
+        ).select_related("plan").first()
+
+        if not active_sub or active_sub.plan.tier != "full":
+            raise PermissionDenied("Coach assignment requires an active full options plan.")
+
+        return membre, active_sub
+
+    def post(self, request):
+        membre, active_sub = self._get_membre_and_validate_plan(request)
+
+        if membre.coach is not None:
+            return Response(
+                {"detail": "You already have a coach. You can only switch after your plan ends."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        coach_id = request.data.get("coach")
+        coach = get_object_or_404(Coach, pk=coach_id, is_active=True)
+
+        membre.coach = coach
+        membre.save()
+
+        return Response({"detail": f"Coach assigned successfully."})
+
+    def delete(self, request):
+        membre, _ = self._get_membre_and_validate_plan(request)
+        membre.coach = None
+        membre.save()
+        return Response({"detail": "Coach unassigned."})
 # ─────────────────────────────────────────
 # Payment Views
 # ─────────────────────────────────────────
