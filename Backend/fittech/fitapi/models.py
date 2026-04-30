@@ -72,21 +72,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 # ─────────────────────────────────────────
-# Membre
-# ─────────────────────────────────────────
-class Membre(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="membre_profile")
-    date_of_birth = models.DateField(blank=True, null=True)
-    health_goal = models.TextField(blank=True, null=True)
-    medical_restrictions = models.TextField(blank=True, null=True)
-    join_date = models.DateField(default=date.today)
-
-    def __str__(self):
-        return f"Membre: {self.user.first_name} {self.user.last_name}"
-
-
-# ─────────────────────────────────────────
 # Coach
 # ─────────────────────────────────────────
 class Coach(models.Model):
@@ -99,6 +84,21 @@ class Coach(models.Model):
     def __str__(self):
         return f"Coach: {self.user.first_name} {self.user.last_name}"
 
+# ─────────────────────────────────────────
+# Membre
+# ─────────────────────────────────────────
+class Membre(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="membre_profile")
+    date_of_birth = models.DateField(blank=True, null=True)
+    health_goal = models.TextField(blank=True, null=True)
+    medical_restrictions = models.TextField(blank=True, null=True)
+    join_date = models.DateField(default=date.today)
+    coach = models.ForeignKey(Coach,on_delete=models.SET_NULL,null=True,blank=True,related_name="assigned_membres",)
+
+    def __str__(self):
+        return f"Membre: {self.user.first_name} {self.user.last_name}"
+
 
 # ─────────────────────────────────────────
 # Subscription Plan
@@ -110,10 +110,16 @@ class SubscriptionPlan(models.Model):
         ("yearly", "Yearly"),
         ("sessions", "Sessions Pack"),
     ]
+    PLAN_TIER_CHOICES = [
+        ("basic", "Basic"),
+        ("advanced", "Advanced"),
+        ("full", "Full Options"),
+    ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     type = models.CharField(max_length=20, choices=PLAN_TYPE_CHOICES)
+    tier = models.CharField(max_length=20, choices=PLAN_TIER_CHOICES, default="basic")
     price = models.DecimalField(max_digits=10, decimal_places=2)
     sessions_count = models.PositiveIntegerField(default=0)
     duration_days = models.PositiveIntegerField(default=30)
@@ -121,7 +127,7 @@ class SubscriptionPlan(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
-        return f"{self.name} - {self.type}"
+        return f"{self.name} - {self.type} - {self.tier}"
 
 
 # ─────────────────────────────────────────
