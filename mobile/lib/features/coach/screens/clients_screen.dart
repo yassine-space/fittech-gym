@@ -1,19 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile/core/providers/coach_provider.dart';
 import 'package:mobile/core/models/membre_model.dart';
-import 'package:intl/intl.dart';
+import 'package:mobile/features/coach/screens/member_detail_screen.dart';
 
-class ClientsScreen extends StatelessWidget {
+class ClientsScreen extends StatefulWidget {
   const ClientsScreen({super.key});
+
+  @override
+  State<ClientsScreen> createState() => _ClientsScreenState();
+}
+
+class _ClientsScreenState extends State<ClientsScreen> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<Membre> _filtered(List<Membre> all) {
+    if (_query.trim().isEmpty) return all;
+    final q = _query.toLowerCase();
+    return all.where((m) {
+      return m.user.fullName.toLowerCase().contains(q) ||
+          m.user.email.toLowerCase().contains(q) ||
+          (m.healthGoal?.toLowerCase().contains(q) ?? false);
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<CoachProvider>(
       builder: (context, provider, _) {
-        final members = provider.members;
+        final allMembers = provider.members;
+        final filtered = _filtered(allMembers);
         final courses = provider.myCourses;
-        final totalClients = members.length;
+        final totalClients = allMembers.length;
         final totalCourses = courses.length;
 
         return Scaffold(
@@ -25,176 +51,253 @@ class ClientsScreen extends StatelessWidget {
                 await provider.loadMembers();
                 await provider.loadCourses();
               },
-              child: SingleChildScrollView(
+              child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: const Color(0xFF8B4513),
-                          child: provider.profile != null
-                              ? Text(
-                                  provider.profile!.user.initials,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                )
-                              : const Icon(Icons.person, color: Colors.white, size: 18),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'PERFORMANCE LAB',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFFD44820),
-                            letterSpacing: 1.2,
+                slivers: [
+                  // ── Header + stats + search ───────────────────────────────
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // App-bar row
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: const Color(0xFF8B4513),
+                                child: provider.profile != null
+                                    ? Text(
+                                        provider.profile!.user.initials,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      )
+                                    : const Icon(Icons.person,
+                                        color: Colors.white, size: 18),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'PERFORMANCE LAB',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFFD44820),
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                              const Spacer(),
+                              const Icon(Icons.notifications_none,
+                                  color: Color(0xFF1C1C1C), size: 24),
+                            ],
                           ),
-                        ),
-                        const Spacer(),
-                        const Icon(Icons.notifications_none, color: Color(0xFF1C1C1C), size: 24),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+                          const SizedBox(height: 24),
 
-                    // OVERVIEW Title
-                    const Text(
-                      'OVERVIEW',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF1C1C1C),
-                        letterSpacing: -0.5,
+                          // Title
+                          const Text(
+                            'OVERVIEW',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF1C1C1C),
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Stats row
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _StatCard(
+                                  label: 'TOTAL CLIENTS',
+                                  value: '$totalClients',
+                                  icon: Icons.trending_up,
+                                  iconColor: const Color(0xFF3DB87A),
+                                  subtitle: 'registered members',
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _StatCard(
+                                  label: 'MY COURSES',
+                                  value: '$totalCourses',
+                                  icon: Icons.bolt,
+                                  iconColor: Colors.white,
+                                  subtitle: 'active courses',
+                                  isPrimary: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Members section header
+                          Row(
+                            children: [
+                              const Text(
+                                'MEMBERS',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF1C1C1C),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (allMembers.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFD44820),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '$totalClients',
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Search bar
+                          if (allMembers.isNotEmpty) ...[
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: TextField(
+                                controller: _searchCtrl,
+                                onChanged: (v) => setState(() => _query = v),
+                                decoration: InputDecoration(
+                                  hintText: 'Search by name, email or goal…',
+                                  hintStyle: const TextStyle(
+                                    color: Color(0xFFD1B8A8),
+                                    fontSize: 13,
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.search_rounded,
+                                    color: Color(0xFFD44820),
+                                    size: 20,
+                                  ),
+                                  suffixIcon: _query.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(Icons.clear,
+                                              size: 18,
+                                              color: Color(0xFF9A7060)),
+                                          onPressed: () => setState(() {
+                                            _query = '';
+                                            _searchCtrl.clear();
+                                          }),
+                                        )
+                                      : null,
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 14),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                  ),
 
-                    // Stats Row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _StatCard(
-                            label: 'TOTAL CLIENTS',
-                            value: '$totalClients',
-                            icon: Icons.trending_up,
-                            iconColor: const Color(0xFF3DB87A),
-                            subtitle: 'registered members',
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _StatCard(
-                            label: 'MY COURSES',
-                            value: '$totalCourses',
-                            icon: Icons.bolt,
-                            iconColor: Colors.white,
-                            subtitle: 'active courses',
-                            isPrimary: true,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // MEMBERS Section
-                    Row(
-                      children: [
-                        const Text(
-                          'MEMBERS',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF1C1C1C),
-                            height: 1.1,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (members.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFD44820),
-                              borderRadius: BorderRadius.circular(12),
+                  // ── Members list ──────────────────────────────────────────
+                  if (provider.membersLoading && allMembers.isEmpty)
+                    const SliverFillRemaining(
+                      child: Center(
+                        child: CircularProgressIndicator(
+                            color: Color(0xFFD44820)),
+                      ),
+                    )
+                  else if (provider.membersError != null && allMembers.isEmpty)
+                    SliverFillRemaining(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline,
+                                size: 48, color: Color(0xFFD44820)),
+                            const SizedBox(height: 8),
+                            const Text('Failed to load members'),
+                            const SizedBox(height: 8),
+                            ElevatedButton(
+                              onPressed: () => provider.loadMembers(),
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFD44820)),
+                              child: const Text('Retry',
+                                  style: TextStyle(color: Colors.white)),
                             ),
-                            child: Text(
-                              '$totalClients',
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (allMembers.isEmpty)
+                    const SliverFillRemaining(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.people_outline,
+                                size: 56, color: Color(0xFF9A7060)),
+                            SizedBox(height: 8),
+                            Text(
+                              'No members yet',
+                              style: TextStyle(
+                                color: Color(0xFF9A7060),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (filtered.isEmpty)
+                    SliverFillRemaining(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.search_off_rounded,
+                                size: 56, color: Color(0xFF9A7060)),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No results for "$_query"',
                               style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
+                                color: Color(0xFF9A7060),
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (_, i) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _MemberCard(membre: filtered[i]),
                           ),
-                      ],
+                          childCount: filtered.length,
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 12),
-
-                    // Loading state
-                    if (provider.membersLoading && members.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(40),
-                          child: CircularProgressIndicator(color: Color(0xFFD44820)),
-                        ),
-                      )
-                    // Error state
-                    else if (provider.membersError != null && members.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(40),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.error_outline, size: 48, color: Color(0xFFD44820)),
-                              const SizedBox(height: 8),
-                              const Text('Failed to load members'),
-                              const SizedBox(height: 8),
-                              ElevatedButton(
-                                onPressed: () => provider.loadMembers(),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFD44820),
-                                ),
-                                child: const Text('Retry', style: TextStyle(color: Colors.white)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    // Empty state
-                    else if (members.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(40),
-                          child: Column(
-                            children: [
-                              Icon(Icons.people_outline, size: 48, color: Color(0xFF9A7060)),
-                              SizedBox(height: 8),
-                              Text(
-                                'No members yet',
-                                style: TextStyle(
-                                  color: Color(0xFF9A7060),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    // Members list
-                    else
-                      ...members.map((membre) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _MemberCard(membre: membre),
-                          )),
-                  ],
-                ),
+                ],
               ),
             ),
           ),
@@ -204,7 +307,9 @@ class ClientsScreen extends StatelessWidget {
   }
 }
 
-// Stats Card
+// ─────────────────────────────────────────────────────────────────────────────
+// _StatCard
+// ─────────────────────────────────────────────────────────────────────────────
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
@@ -261,7 +366,8 @@ class _StatCard extends StatelessWidget {
                 child: Text(
                   subtitle,
                   style: TextStyle(
-                    color: isPrimary ? Colors.white : const Color(0xFF3DB87A),
+                    color:
+                        isPrimary ? Colors.white70 : const Color(0xFF3DB87A),
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                   ),
@@ -275,43 +381,43 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// Member Card
+// ─────────────────────────────────────────────────────────────────────────────
+// _MemberCard
+// ─────────────────────────────────────────────────────────────────────────────
 class _MemberCard extends StatelessWidget {
   final Membre membre;
-
   const _MemberCard({required this.membre});
+
+  static const _avatarColors = [
+    Color(0xFF5A3826),
+    Color(0xFF7A4A30),
+    Color(0xFFD4956A),
+    Color(0xFF8B4513),
+    Color(0xFF6B3A2A),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final user = membre.user;
+    final colorIndex = user.fullName.hashCode.abs() % _avatarColors.length;
     final joinDate = membre.joinDate != null
         ? DateFormat('d MMM yyyy').format(membre.joinDate!)
         : 'Unknown';
-
-    // Generate a color based on the user's name for variety
-    final colors = [
-      const Color(0xFF5A3826),
-      const Color(0xFF7A4A30),
-      const Color(0xFFD4956A),
-      const Color(0xFF8B4513),
-      const Color(0xFF6B3A2A),
-    ];
-    final colorIndex = user.fullName.hashCode.abs() % colors.length;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFFEFDDD5),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
           // Avatar
           Container(
-            width: 48,
-            height: 48,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
-              color: colors[colorIndex],
+              color: _avatarColors[colorIndex],
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -320,13 +426,14 @@ class _MemberCard extends StatelessWidget {
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
-                  fontSize: 14,
+                  fontSize: 15,
                 ),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          // Content
+
+          // Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,7 +446,7 @@ class _MemberCard extends StatelessWidget {
                     color: Color(0xFF1C1C1C),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   user.email,
                   style: const TextStyle(
@@ -348,50 +455,101 @@ class _MemberCard extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
+                // Goal + join date row
                 Row(
                   children: [
-                    if (membre.healthGoal != null && membre.healthGoal!.isNotEmpty) ...[
+                    if (membre.healthGoal != null &&
+                        membre.healthGoal!.isNotEmpty) ...[
+                      const Icon(Icons.flag_outlined,
+                          size: 10, color: Color(0xFF9A7060)),
+                      const SizedBox(width: 3),
                       Flexible(
                         child: Text(
-                          'Goal: ${membre.healthGoal}',
+                          membre.healthGoal!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF9A7060),
-                          ),
+                              fontSize: 10, color: Color(0xFF9A7060)),
                         ),
                       ),
-                      const Text(' · ', style: TextStyle(color: Color(0xFF9A7060), fontSize: 10)),
+                      const Text(' · ',
+                          style: TextStyle(
+                              color: Color(0xFF9A7060), fontSize: 10)),
                     ],
                     Text(
                       'Joined $joinDate',
                       style: const TextStyle(
-                        fontSize: 10,
-                        color: Color(0xFF9A7060),
-                      ),
+                          fontSize: 10, color: Color(0xFF9A7060)),
                     ),
                   ],
                 ),
+                // Medical restriction warning badge
+                if (membre.medicalRestrictions != null &&
+                    membre.medicalRestrictions!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD44820).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            size: 10, color: Color(0xFFD44820)),
+                        SizedBox(width: 3),
+                        Text(
+                          'Medical restrictions',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFD44820),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          // View button
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFD1B8A8), width: 1),
-              borderRadius: BorderRadius.circular(8),
+          const SizedBox(width: 10),
+
+          // View details button
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MemberDetailScreen(membre: membre),
+              ),
             ),
-            child: const Text(
-              'View\nDetails',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1C1C1C),
-                height: 1.2,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: const Color(0xFFD1B8A8), width: 1),
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.person_search_rounded,
+                      size: 16, color: Color(0xFFD44820)),
+                  SizedBox(height: 2),
+                  Text(
+                    'View',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1C1C1C),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

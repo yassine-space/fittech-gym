@@ -5,7 +5,7 @@ import 'package:mobile/core/providers/signup_provider.dart';
 import 'package:mobile/core/providers/coach_provider.dart';
 import 'package:mobile/core/services/apiservice.dart';
 import 'package:mobile/navigation/router.dart';
-
+import 'package:mobile/core/services/coach_service.dart'; // Add this import at the top
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +15,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SignupProvider()),
-        ChangeNotifierProvider(create: (_) => CoachProvider()),
+        ChangeNotifierProvider(create: (_) => CoachProvider(CoachService())),
       ],
       child: MyApp(router: appRouter),
     ),

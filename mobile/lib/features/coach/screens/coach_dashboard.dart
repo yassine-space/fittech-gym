@@ -28,6 +28,8 @@ class _CoachDashboardState extends State<CoachDashboard> {
     provider.loadProfile();
     provider.loadMembers();
     provider.loadCourses();
+    provider.loadReservations();
+    provider.loadWaitlist();
   }
 
   @override

@@ -1,136 +1,157 @@
-import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
 import 'package:mobile/core/models/coach_profile_model.dart';
-import 'package:mobile/core/models/course.dart';
 import 'package:mobile/core/models/membre_model.dart';
+import 'package:mobile/core/models/course.dart';
+import 'package:mobile/core/models/reservation_model.dart';
+import 'package:mobile/core/models/review_model.dart';
+import 'package:mobile/core/models/certificate_model.dart';
+import 'package:mobile/core/models/waitlist_model.dart';
 import 'package:mobile/core/services/coach_service.dart';
-import 'package:mobile/core/services/apiservice.dart';
 
-/// Provider that manages all coach-related state.
-///
-/// Consumed by coach screens via `Provider.of<CoachProvider>(context)`.
+// ─────────────────────────────────────────────────────────────────────────────
+// CoachProvider
+// Handles all state that the coach-facing app needs.
+// ─────────────────────────────────────────────────────────────────────────────
 class CoachProvider extends ChangeNotifier {
-  final CoachService _service = CoachService();
+  final CoachService _api;
+  CoachProvider(this._api);
 
-  // ─── State ──────────────────────────────────────────────────────────────
-
+  // ── Profile ────────────────────────────────────────────────────────────────
   CoachProfile? _profile;
-  List<Membre> _members = [];
-  List<Course> _courses = [];
-
-  bool _profileLoading = false;
-  bool _membersLoading = false;
-  bool _coursesLoading = false;
-
-  String? _profileError;
-  String? _membersError;
-  String? _coursesError;
-
-  // ─── Getters ────────────────────────────────────────────────────────────
+  bool profileLoading = false;
+  String? profileError;
 
   CoachProfile? get profile => _profile;
-  List<Membre> get members => _members;
-  List<Course> get courses => _courses;
-
-  bool get profileLoading => _profileLoading;
-  bool get membersLoading => _membersLoading;
-  bool get coursesLoading => _coursesLoading;
-
-  String? get profileError => _profileError;
-  String? get membersError => _membersError;
-  String? get coursesError => _coursesError;
-
-  /// All courses created by the current coach.
-  List<Course> get myCourses {
-    final coachId = _profile?.id ?? AuthHolder.coachProfileId;
-    if (coachId == null) return _courses;
-    return _courses.where((c) => c.coachId == coachId).toList();
-  }
-
-  /// Upcoming courses (date is in the future).
-  List<Course> get upcomingCourses {
-    final now = DateTime.now();
-    return myCourses.where((c) => c.dateTime.isAfter(now)).toList();
-  }
-
-  /// Ended courses (date is in the past).
-  List<Course> get endedCourses {
-    final now = DateTime.now();
-    return myCourses.where((c) => c.dateTime.isBefore(now)).toList();
-  }
-
-  // ─── Profile ────────────────────────────────────────────────────────────
 
   Future<void> loadProfile() async {
-    _profileLoading = true;
-    _profileError = null;
+    profileLoading = true;
+    profileError = null;
     notifyListeners();
-
     try {
-      _profile = await _service.getMyProfile();
-
-      // Store coach profile ID for course filtering
-      if (_profile != null) {
-        AuthHolder.coachProfileId = _profile!.id;
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('coach_profile_id', _profile!.id);
-      }
-
-      _profileLoading = false;
-      notifyListeners();
+      // ✅ USING THE SERVICE METHOD
+      _profile = await _api.getMyProfile();
     } catch (e) {
-      _profileError = e.toString();
-      _profileLoading = false;
+      profileError = e.toString();
+    } finally {
+      profileLoading = false;
       notifyListeners();
-      debugPrint('❌ [CoachProvider] loadProfile error: $e');
     }
   }
 
-  Future<void> updateProfile(Map<String, dynamic> data) async {
-    try {
-      _profile = await _service.updateMyProfile(data);
-      notifyListeners();
-    } catch (e) {
-      debugPrint('❌ [CoachProvider] updateProfile error: $e');
-      rethrow;
-    }
+  Future<void> updateCoachProfile({
+    String? specialties,
+    String? biography,
+    int? yearsOfExperience,
+  }) async {
+    // ✅ USING THE SERVICE METHOD
+    await _api.updateMyProfile({
+      if (specialties != null) 'specialties': specialties,
+      if (biography != null) 'biography': biography,
+      if (yearsOfExperience != null) 'years_of_experience': yearsOfExperience,
+    });
+    await loadProfile();
   }
 
-  // ─── Members ────────────────────────────────────────────────────────────
+  Future<void> updateUserInfo({
+    String? firstName,
+    String? lastName,
+    String? phone,
+  }) async {
+    // ✅ USING THE SERVICE METHOD
+    await _api.updateMyUser({
+      if (firstName != null) 'first_name': firstName,
+      if (lastName != null) 'last_name': lastName,
+      if (phone != null) 'phone': phone,
+    });
+    await loadProfile();
+  }
+
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+    required String newPassword2,
+    required String refreshToken, // Note: CoachService might not need this if it uses AuthHolder internally
+  }) async {
+    // ✅ USING THE SERVICE METHOD
+    await _api.changePassword(
+      oldPassword: oldPassword,
+      newPassword: newPassword,
+      newPassword2: newPassword2,
+    );
+  }
+
+  Future<void> logout() async {
+    // ✅ USING THE SERVICE METHOD
+    try {
+      await _api.logout();
+    } catch (_) {}
+    
+    _profile = null;
+    _members = [];
+    _courses = [];
+    _reviews = [];
+    _certificates = [];
+    notifyListeners();
+  }
+
+  // ── Members (read-only for coach) ──────────────────────────────────────────
+  List<Membre> _members = [];
+  bool membersLoading = false;
+  String? membersError;
+
+  List<Membre> get members => _members;
 
   Future<void> loadMembers() async {
-    _membersLoading = true;
-    _membersError = null;
+    membersLoading = true;
+    membersError = null;
     notifyListeners();
-
     try {
-      _members = await _service.getMembers();
-      _membersLoading = false;
-      notifyListeners();
+      // ✅ USING THE SERVICE METHOD
+      _members = await _api.getMembers();
     } catch (e) {
-      _membersError = e.toString();
-      _membersLoading = false;
+      membersError = e.toString();
+    } finally {
+      membersLoading = false;
       notifyListeners();
-      debugPrint('❌ [CoachProvider] loadMembers error: $e');
     }
   }
 
-  // ─── Courses ────────────────────────────────────────────────────────────
+  // ── Courses ────────────────────────────────────────────────────────────────
+  List<Course> _courses = [];
+  bool coursesLoading = false;
+  String? coursesError;
+
+  List<Course> get courses => _courses;
+
+  List<Course> get myCourses {
+    if (_profile == null) return _courses;
+    return _courses.where((c) => c.coachId == _profile!.id).toList();
+  }
+
+  List<Course> get upcomingCourses {
+    final now = DateTime.now();
+    return myCourses.where((c) => c.dateTime.isAfter(now)).toList()
+      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+  }
+
+  List<Course> get endedCourses {
+    final now = DateTime.now();
+    return myCourses.where((c) => c.dateTime.isBefore(now)).toList()
+      ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
+  }
 
   Future<void> loadCourses() async {
-    _coursesLoading = true;
-    _coursesError = null;
+    coursesLoading = true;
+    coursesError = null;
     notifyListeners();
-
     try {
-      _courses = await _service.getCourses();
-      _coursesLoading = false;
-      notifyListeners();
+      // ✅ USING THE SERVICE METHOD
+      _courses = await _api.getCourses();
     } catch (e) {
-      _coursesError = e.toString();
-      _coursesLoading = false;
+      coursesError = e.toString();
+    } finally {
+      coursesLoading = false;
       notifyListeners();
-      debugPrint('❌ [CoachProvider] loadCourses error: $e');
     }
   }
 
@@ -142,44 +163,155 @@ class CoachProvider extends ChangeNotifier {
     required int durationMinutes,
     required int maxParticipants,
   }) async {
-    final coachId = _profile?.id ?? AuthHolder.coachProfileId ?? '';
-    await _service.createCourse(
+    if (_profile == null) return;
+    
+    // ✅ USING THE SERVICE METHOD
+    await _api.createCourse(
       title: title,
       description: description,
       level: level,
       dateTime: dateTime,
       durationMinutes: durationMinutes,
       maxParticipants: maxParticipants,
-      coachProfileId: coachId,
+      coachProfileId: _profile!.id,
     );
     await loadCourses();
   }
 
-  Future<void> deleteCourse(String id) async {
-    await _service.deleteCourse(id);
-    _courses.removeWhere((c) => c.id == id);
-    notifyListeners();
+  Future<void> deleteCourse(String courseId) async {
+    // ✅ USING THE SERVICE METHOD
+    await _api.deleteCourse(courseId);
+    await loadCourses();
   }
 
-  // ─── Auth ───────────────────────────────────────────────────────────────
+  // ── Reviews ────────────────────────────────────────────────────────────────
+  List<CoachReview> _reviews = [];
+  bool reviewsLoading = false;
+  String? reviewsError;
 
-  Future<void> logout() async {
-    await _service.logout();
-    _profile = null;
-    _members = [];
-    _courses = [];
-    notifyListeners();
+  List<CoachReview> get reviews => _reviews;
+
+  double get averageRating {
+    if (_reviews.isEmpty) return 0.0;
+    final sum = _reviews.fold<int>(0, (acc, r) => acc + r.rating);
+    return sum / _reviews.length;
   }
 
-  // ─── Reset ──────────────────────────────────────────────────────────────
+  int reviewCountForStar(int star) =>
+      _reviews.where((r) => r.rating == star).length;
 
-  void reset() {
-    _profile = null;
-    _members = [];
-    _courses = [];
-    _profileError = null;
-    _membersError = null;
-    _coursesError = null;
+  Future<void> loadReviews() async {
+    if (_profile == null) return;
+    reviewsLoading = true;
+    reviewsError = null;
     notifyListeners();
+    try {
+      // ✅ USING THE SERVICE METHOD
+      final rawData = await _api.getReviews(_profile!.id);
+      _reviews = rawData
+          .map((e) => CoachReview.fromJson(e))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    } catch (e) {
+      reviewsError = e.toString();
+    } finally {
+      reviewsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ── Certificates ───────────────────────────────────────────────────────────
+  List<CoachCertificate> _certificates = [];
+  bool certificatesLoading = false;
+  String? certificatesError;
+
+  List<CoachCertificate> get certificates => _certificates;
+
+  Future<void> loadCertificates() async {
+    if (_profile == null) return;
+    certificatesLoading = true;
+    certificatesError = null;
+    notifyListeners();
+    try {
+      // ✅ USING THE SERVICE METHOD
+      final rawData = await _api.getCertificates(_profile!.id);
+      _certificates = rawData
+          .map((e) => CoachCertificate.fromJson(e))
+          .toList()
+        ..sort((a, b) => b.issueDate.compareTo(a.issueDate));
+    } catch (e) {
+      certificatesError = e.toString();
+    } finally {
+      certificatesLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> uploadCertificate({
+    required String title,
+    required String issuingOrganization,
+    required DateTime issueDate,
+    required String filePath,
+  }) async {
+    if (_profile == null) return;
+    
+    // ✅ USING THE SERVICE METHOD
+    await _api.addCertificate(
+      coachId: _profile!.id,
+      title: title,
+      issuingOrganization: issuingOrganization,
+      issueDate: '${issueDate.year}-${issueDate.month.toString().padLeft(2, '0')}-${issueDate.day.toString().padLeft(2, '0')}',
+      filePath: filePath,
+    );
+    await loadCertificates();
+  }
+
+  Future<void> deleteCertificate(String certId) async {
+    if (_profile == null) return;
+    
+    // ✅ USING THE SERVICE METHOD
+    await _api.deleteCertificate(_profile!.id, certId);
+    await loadCertificates();
+  }
+  // ── Reservations ─────────────────────────────────────────────────────────
+  List<CourseReservation> _reservations = [];
+  bool reservationsLoading = false;
+  String? reservationsError;
+
+  List<CourseReservation> get reservations => _reservations;
+
+  Future<void> loadReservations() async {
+    reservationsLoading = true;
+    reservationsError = null;
+    notifyListeners();
+    try {
+      _reservations = await _api.getReservations();
+    } catch (e) {
+      reservationsError = e.toString();
+    } finally {
+      reservationsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ── Waitlist ─────────────────────────────────────────────────────────────
+  List<CourseWaitlist> _waitlist = [];
+  bool waitlistLoading = false;
+  String? waitlistError;
+
+  List<CourseWaitlist> get waitlist => _waitlist;
+
+  Future<void> loadWaitlist() async {
+    waitlistLoading = true;
+    waitlistError = null;
+    notifyListeners();
+    try {
+      _waitlist = await _api.getWaitlist();
+    } catch (e) {
+      waitlistError = e.toString();
+    } finally {
+      waitlistLoading = false;
+      notifyListeners();
+    }
   }
 }

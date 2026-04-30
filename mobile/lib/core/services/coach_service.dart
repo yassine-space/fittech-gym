@@ -2,7 +2,11 @@ import 'package:mobile/core/models/coach_profile_model.dart';
 import 'package:mobile/core/models/course.dart';
 import 'package:mobile/core/models/membre_model.dart';
 import 'package:mobile/core/models/user_model.dart';
+// Note: Make sure to import your other models here too!
+import 'package:mobile/core/models/reservation_model.dart'; 
+import 'package:mobile/core/models/waitlist_model.dart';
 import 'package:mobile/core/services/apiservice.dart';
+import 'package:dio/dio.dart'; // Required for file uploads (FormData and MultipartFile)
 
 /// Service for all coach-related backend API calls.
 ///
@@ -18,9 +22,9 @@ class CoachService {
     return CoachProfile.fromJson(res.data);
   }
 
-  /// PUT /coaches/me/ — update the coach profile (specialties, biography, etc.)
+  /// PATCH /coaches/me/ — update the coach profile (specialties, biography, etc.)
   Future<CoachProfile> updateMyProfile(Map<String, dynamic> data) async {
-    final res = await _api.request(DioMethode.put, '/coaches/me/', data: data);
+    final res = await _api.request(DioMethode.patch, '/coaches/me/', data: data);
     return CoachProfile.fromJson(res.data);
   }
 
@@ -32,9 +36,9 @@ class CoachService {
     return UserModel.fromJson(res.data);
   }
 
-  /// PUT /auth/me/ — update user account (name, email, phone, photo).
+  /// PATCH /auth/me/ — update user account (name, email, phone, photo).
   Future<UserModel> updateMyUser(Map<String, dynamic> data) async {
-    final res = await _api.request(DioMethode.put, '/auth/me/', data: data);
+    final res = await _api.request(DioMethode.patch, '/auth/me/', data: data);
     return UserModel.fromJson(res.data);
   }
 
@@ -60,17 +64,6 @@ class CoachService {
     final res = await _api.request(DioMethode.get, '/courses/');
     final List data = res.data is List ? res.data : (res.data['results'] ?? []);
     return data.map((e) => Course.fromJson(e)).toList();
-  }
-
-  /// GET /courses/ filtered by current coach ID.
-  Future<List<Course>> getMyCourses() async {
-    final allCourses = await getCourses();
-    final myId = AuthHolder.id;
-    if (myId == null) return allCourses;
-    // Filter to only courses created by this coach's coach profile
-    // The backend returns coach as the Coach model UUID, not User UUID.
-    // We need to match using the coach profile ID.
-    return allCourses;
   }
 
   /// POST /courses/ — create a new course.
@@ -108,6 +101,73 @@ class CoachService {
   /// DELETE /courses/<id>/ — delete a course.
   Future<void> deleteCourse(String id) async {
     await _api.request(DioMethode.delete, '/courses/$id/');
+  }
+
+  // ─── Reservations ───────────────────────────────────────────────────────
+
+  /// GET /reservations/ — list reservations
+  Future<List<CourseReservation>> getReservations() async {
+    final res = await _api.request(DioMethode.get, '/reservations/');
+    final List data = res.data is List ? res.data : (res.data['results'] ?? []);
+    return data.map((e) => CourseReservation.fromJson(e)).toList();
+  }
+
+  /// PATCH /reservations/<id>/cancel/ — cancel a specific reservation
+  Future<void> cancelReservation(String id) async {
+    await _api.request(DioMethode.patch, '/reservations/$id/cancel/');
+  }
+
+  // ─── Waitlist ───────────────────────────────────────────────────────────
+
+  /// GET /waitlist/ — list waitlist entries
+  Future<List<CourseWaitlist>> getWaitlist() async {
+    final res = await _api.request(DioMethode.get, '/waitlist/');
+    final List data = res.data is List ? res.data : (res.data['results'] ?? []);
+    return data.map((e) => CourseWaitlist.fromJson(e)).toList();
+  }
+
+  // ─── Reviews ────────────────────────────────────────────────────────────
+
+  /// GET /coaches/<coach_id>/reviews/ — list reviews for the coach
+  Future<List<dynamic>> getReviews(String coachId) async {
+    final res = await _api.request(DioMethode.get, '/coaches/$coachId/reviews/');
+    return res.data is List ? res.data : (res.data['results'] ?? []);
+  }
+
+  // ─── Certificates ───────────────────────────────────────────────────────
+
+  /// GET /coaches/<coach_id>/certificates/ — list certificates
+  Future<List<dynamic>> getCertificates(String coachId) async {
+    final res = await _api.request(DioMethode.get, '/coaches/$coachId/certificates/');
+    return res.data is List ? res.data : (res.data['results'] ?? []);
+  }
+
+  /// DELETE /coaches/<coach_id>/certificates/<cert_id>/ — delete certificate
+  Future<void> deleteCertificate(String coachId, String certId) async {
+    await _api.request(DioMethode.delete, '/coaches/$coachId/certificates/$certId/');
+  }
+
+  /// POST /coaches/<coach_id>/certificates/ — upload a new certificate (PDF/Image)
+  Future<void> addCertificate({
+    required String coachId,
+    required String title,
+    required String issuingOrganization,
+    required String issueDate,
+    required String filePath,
+  }) async {
+    // We use Dio's FormData for Multipart requests (files)
+    FormData formData = FormData.fromMap({
+      'title': title,
+      'issuing_organization': issuingOrganization,
+      'issue_date': issueDate,
+      'file': await MultipartFile.fromFile(filePath),
+    });
+
+    await _api.request(
+      DioMethode.post, 
+      '/coaches/$coachId/certificates/', 
+      data: formData
+    );
   }
 
   // ─── Auth Actions ───────────────────────────────────────────────────────

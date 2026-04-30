@@ -554,6 +554,14 @@ class _CoachCourseCard extends StatelessWidget {
                             color: _kGrey, size: 20),
                         itemBuilder: (_) => [
                           const PopupMenuItem(
+                             value: 'participants',
+                             child: Row(children: [
+                               Icon(Icons.people_outline, size: 16, color: _kNavy),
+                               SizedBox(width: 8),
+                               Text('Participants', style: TextStyle(fontWeight: FontWeight.w600, color: _kNavy)),
+                             ]),
+                           ),
+                          const PopupMenuItem(
                             value: 'edit',
                             child: Row(children: [
                               Icon(Icons.edit_outlined,
