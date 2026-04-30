@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/models/coach_profile_model.dart';
 import 'package:mobile/core/models/membre_model.dart';
@@ -45,9 +46,9 @@ class CoachProvider extends ChangeNotifier {
   }) async {
     // ✅ USING THE SERVICE METHOD
     await _api.updateMyProfile({
-      if (specialties != null) 'specialties': specialties,
-      if (biography != null) 'biography': biography,
-      if (yearsOfExperience != null) 'years_of_experience': yearsOfExperience,
+      'specialties': ?specialties,
+      'biography': ?biography,
+      'years_of_experience': ?yearsOfExperience,
     });
     await loadProfile();
   }
@@ -59,9 +60,9 @@ class CoachProvider extends ChangeNotifier {
   }) async {
     // ✅ USING THE SERVICE METHOD
     await _api.updateMyUser({
-      if (firstName != null) 'first_name': firstName,
-      if (lastName != null) 'last_name': lastName,
-      if (phone != null) 'phone': phone,
+      'first_name': ?firstName,
+      'last_name': ?lastName,
+      'phone': ?phone,
     });
     await loadProfile();
   }
@@ -247,25 +248,25 @@ class CoachProvider extends ChangeNotifier {
     }
   }
 
+// Make sure to import 'package:file_picker/file_picker.dart'; at the top of coach_provider.dart
+
   Future<void> uploadCertificate({
     required String title,
     required String issuingOrganization,
     required DateTime issueDate,
-    required String filePath,
+    required PlatformFile file, // ✅ Changed from String filePath
   }) async {
     if (_profile == null) return;
     
-    // ✅ USING THE SERVICE METHOD
     await _api.addCertificate(
       coachId: _profile!.id,
       title: title,
       issuingOrganization: issuingOrganization,
       issueDate: '${issueDate.year}-${issueDate.month.toString().padLeft(2, '0')}-${issueDate.day.toString().padLeft(2, '0')}',
-      filePath: filePath,
+      file: file, // ✅ Pass the PlatformFile to the API service
     );
     await loadCertificates();
   }
-
   Future<void> deleteCertificate(String certId) async {
     if (_profile == null) return;
     

@@ -17,7 +17,9 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
   final _orgController = TextEditingController();
   
   DateTime? _selectedDate;
-  String? _selectedFilePath;
+  
+  // ✅ FIX 1: Use PlatformFile instead of a String path
+  PlatformFile? _selectedFile; 
   String? _selectedFileName;
   
   bool _isUploading = false;
@@ -31,15 +33,16 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
 
   // ─── Pick File Logic ──────────────────────────────────────────────────
   Future<void> _pickFile() async {
-    // Allows picking PDFs and common image formats
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      withData: true, // ✅ FIX 2: Crucial for Flutter Web to load file bytes into memory
     );
 
-    if (result != null && result.files.single.path != null) {
+    // ✅ FIX 3: Check if result is not null, ignore path checks
+    if (result != null) {
       setState(() {
-        _selectedFilePath = result.files.single.path;
+        _selectedFile = result.files.single; // Store the whole PlatformFile object
         _selectedFileName = result.files.single.name;
       });
     }
@@ -56,9 +59,9 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFFD44820), // Header background color
-              onPrimary: Colors.white, // Header text color
-              onSurface: Color(0xFF1C1C1C), // Body text color
+              primary: Color(0xFFD44820), 
+              onPrimary: Colors.white, 
+              onSurface: Color(0xFF1C1C1C), 
             ),
           ),
           child: child!,
@@ -84,7 +87,8 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
       return;
     }
 
-    if (_selectedFilePath == null) {
+    // ✅ FIX 4: Check if _selectedFile is null instead of _selectedFilePath
+    if (_selectedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please attach a certificate file (PDF/Image).')),
       );
@@ -96,18 +100,19 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
     try {
       final provider = context.read<CoachProvider>();
       
+      // ✅ FIX 5: Pass the whole PlatformFile object to the provider
       await provider.uploadCertificate(
         title: _titleController.text.trim(),
         issuingOrganization: _orgController.text.trim(),
         issueDate: _selectedDate!,
-        filePath: _selectedFilePath!, // Pass the actual file path to Dio
+        file: _selectedFile!, // Updated parameter name here
       );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Certificate added successfully!'), backgroundColor: Color(0xFF3DB87A)),
       );
-      Navigator.pop(context); // Go back to certificates list
+      Navigator.pop(context); 
       
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -143,7 +148,6 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title Input
                     _buildLabel('Certificate Title'),
                     TextFormField(
                       controller: _titleController,
@@ -152,7 +156,6 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Organization Input
                     _buildLabel('Issuing Organization'),
                     TextFormField(
                       controller: _orgController,
@@ -161,7 +164,6 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Date Picker
                     _buildLabel('Issue Date'),
                     InkWell(
                       onTap: _pickDate,
@@ -199,10 +201,11 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: _selectedFilePath != null ? const Color(0xFF3DB87A).withOpacity(0.1) : Colors.white,
+                          // ✅ FIX 6: Updated UI checks to use _selectedFile
+                          color: _selectedFile != null ? const Color(0xFF3DB87A).withOpacity(0.1) : Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: _selectedFilePath != null ? const Color(0xFF3DB87A) : const Color(0xFFD44820), 
+                            color: _selectedFile != null ? const Color(0xFF3DB87A) : const Color(0xFFD44820), 
                             width: 1.5,
                             style: BorderStyle.solid,
                           ),
@@ -210,8 +213,8 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                         child: Column(
                           children: [
                             Icon(
-                              _selectedFilePath != null ? Icons.check_circle : Icons.upload_file, 
-                              color: _selectedFilePath != null ? const Color(0xFF3DB87A) : const Color(0xFFD44820), 
+                              _selectedFile != null ? Icons.check_circle : Icons.upload_file, 
+                              color: _selectedFile != null ? const Color(0xFF3DB87A) : const Color(0xFFD44820), 
                               size: 40,
                             ),
                             const SizedBox(height: 12),
@@ -220,7 +223,7 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold, 
-                                color: _selectedFilePath != null ? const Color(0xFF3DB87A) : const Color(0xFF1C1C1C),
+                                color: _selectedFile != null ? const Color(0xFF3DB87A) : const Color(0xFF1C1C1C),
                               ),
                             ),
                           ],
@@ -229,7 +232,6 @@ class _AddCertificateScreenState extends State<AddCertificateScreen> {
                     ),
                     const SizedBox(height: 40),
 
-                    // Submit Button
                     SizedBox(
                       width: double.infinity,
                       height: 55,

@@ -423,7 +423,7 @@ class _ProfileCard extends StatelessWidget {
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _initialsText(initials),
+                      errorBuilder: (_, _, _) => _initialsText(initials),
                     )
                   : _initialsText(initials),
             ),

@@ -20,19 +20,19 @@ class Apiservice {
 
   String get baseUrl {
     if (kIsWeb) return 'http://localhost:8000';  // Changed from 127.0.0.1
-    return 'http://192.168.171.14:8000';
+    return 'http://192.168.1.38:8000';
   }
 
   final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    ),
-  );
+  BaseOptions(
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+    // ✅ REMOVED hardcoded Content-Type — let Dio set it per request
+    headers: {
+      'Accept': 'application/json',
+    },
+  ),
+);
 
   // ─── Token Management ───────────────────────────────────────────────────
 
@@ -88,34 +88,44 @@ class Apiservice {
   }
 
   // ─── Core Request ───────────────────────────────────────────────────────
+Future<Response> request(
+  DioMethode methode,
+  String url, {
+  dynamic data,
+  Options? options,
+}) async {
+  final fullUrl = '$baseUrl$url';
+  debugPrint('>>> [API] ${methode.name.toUpperCase()} $fullUrl');
 
-  Future<Response> request(
-    DioMethode methode,
-    String url, {
-    dynamic data,
-    Options? options,
-  }) async {
-    final fullUrl = '$baseUrl$url';
-    debugPrint('>>> [API] ${methode.name.toUpperCase()} $fullUrl');
-
-    if (AuthHolder.token != null) {
-      _dio.options.headers['Authorization'] = 'Bearer ${AuthHolder.token}';
-    }
-
-    switch (methode) {
-      case DioMethode.get:
-        return await _dio.get(fullUrl);
-      case DioMethode.post:
-        return await _dio.post(fullUrl, data: data, options: options);
-      case DioMethode.put:
-        return await _dio.put(fullUrl, data: data, options: options);
-      case DioMethode.delete:
-        return await _dio.delete(fullUrl);
-      case DioMethode.patch:
-        return await _dio.patch(fullUrl, data: data, options: options);
-    }
+  // ✅ Build headers per-request so FormData is never blocked by Content-Type
+  final Map<String, dynamic> headers = {};
+  if (AuthHolder.token != null) {
+    headers['Authorization'] = 'Bearer ${AuthHolder.token}';
   }
 
+  // ✅ Only set Content-Type manually for non-FormData requests
+  if (data is! FormData) {
+    headers['Content-Type'] = 'application/json';
+  }
+  // For FormData, Dio automatically sets multipart/form-data with boundary
+
+  final requestOptions = (options ?? Options()).copyWith(
+    headers: headers,
+  );
+
+  switch (methode) {
+    case DioMethode.get:
+      return await _dio.get(fullUrl, options: requestOptions);
+    case DioMethode.post:
+      return await _dio.post(fullUrl, data: data, options: requestOptions);
+    case DioMethode.put:
+      return await _dio.put(fullUrl, data: data, options: requestOptions);
+    case DioMethode.delete:
+      return await _dio.delete(fullUrl, options: requestOptions);
+    case DioMethode.patch:
+      return await _dio.patch(fullUrl, data: data, options: requestOptions);
+  }
+}
   // ─── Auth Endpoints ─────────────────────────────────────────────────────
 
   Future<Response> register(SignupData data) async {
@@ -151,15 +161,15 @@ class Apiservice {
       DioMethode.post,
       '/auth/register/',
       data: formData,
-      options: Options(contentType: 'multipart/form-data'),
     );
   }
 
   Future<Response> login(String email, String password) async {
-    return await request(
-      DioMethode.post,
-      '/auth/login/',
-      data: {'email': email, 'password': password},
-    );
-  }
+  debugPrint('>>> LOGIN PAYLOAD: email=$email password=$password');
+  return await request(
+    DioMethode.post,
+    '/auth/login/',
+    data: {'email': email, 'password': password},
+  );
+}
 }

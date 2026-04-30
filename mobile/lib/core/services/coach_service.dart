@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:mobile/core/models/coach_profile_model.dart';
 import 'package:mobile/core/models/course.dart';
 import 'package:mobile/core/models/membre_model.dart';
@@ -146,30 +147,37 @@ class CoachService {
   Future<void> deleteCertificate(String coachId, String certId) async {
     await _api.request(DioMethode.delete, '/coaches/$coachId/certificates/$certId/');
   }
+// Inside CoachService.dart
 
-  /// POST /coaches/<coach_id>/certificates/ — upload a new certificate (PDF/Image)
-  Future<void> addCertificate({
-    required String coachId,
-    required String title,
-    required String issuingOrganization,
-    required String issueDate,
-    required String filePath,
-  }) async {
-    // We use Dio's FormData for Multipart requests (files)
-    FormData formData = FormData.fromMap({
-      'title': title,
-      'issuing_organization': issuingOrganization,
-      'issue_date': issueDate,
-      'file': await MultipartFile.fromFile(filePath),
-    });
+Future<void> addCertificate({
+  required String coachId,
+  required String title,
+  required String issuingOrganization,
+  required String issueDate,
+  required PlatformFile file, 
+}) async {
+  
+  final multipartFile = MultipartFile.fromBytes(
+    file.bytes!, 
+    filename: file.name,
+  );
 
-    await _api.request(
-      DioMethode.post, 
-      '/coaches/$coachId/certificates/', 
-      data: formData
-    );
-  }
+  FormData formData = FormData.fromMap({
+    'coach': coachId,
+    'title': title,
+    'issuing_organization': issuingOrganization,
+    'issue_date': issueDate,
+    'file': multipartFile,
+  });
 
+  // ✅ FIX: Use your custom _api wrapper instead of calling dio.post directly!
+  await _api.request(
+    DioMethode.post,
+    '/coaches/$coachId/certificates/',
+    data: formData,
+  );
+}
+  
   // ─── Auth Actions ───────────────────────────────────────────────────────
 
   /// POST /auth/logout/ — blacklist the refresh token and clear local storage.

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart'; // Added File Picker
 import 'package:mobile/core/providers/coach_provider.dart';
 import 'package:mobile/core/models/certificate_model.dart';
+import 'package:url_launcher/url_launcher.dart'; // ✅ Add this import at the top of your file
 
 class CertificatesScreen extends StatefulWidget {
   const CertificatesScreen({super.key});
@@ -166,76 +167,120 @@ class _CertificateTile extends StatelessWidget {
   final VoidCallback onDelete;
   const _CertificateTile({required this.cert, required this.onDelete});
 
+  // ─── Launch URL Logic ──────────────────────────────────────────────────
+  Future<void> _viewFile(BuildContext context) async {
+    if (cert.fileUrl == null || cert.fileUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No file attached to this certificate.')),
+      );
+      return;
+    }
+
+    // Parse the URL from the backend
+    final uri = Uri.parse(cert.fileUrl!);
+    
+    try {
+      // Launch Mode externalApplication opens a new tab on web
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the file.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormat('MMMM yyyy').format(cert.issueDate);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFD44820).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+    // ✅ Wrap with InkWell to make the whole card clickable
+    return InkWell(
+      onTap: () => _viewFile(context), // Call the view file function
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD44820).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.workspace_premium_rounded,
+                color: Color(0xFFD44820),
+                size: 28,
+              ),
             ),
-            child: const Icon(
-              Icons.workspace_premium_rounded,
-              color: Color(0xFFD44820),
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  cert.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: Color(0xFF1C1C1C),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  cert.issuingOrganization,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF9A7060),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today, size: 11, color: Color(0xFF9A7060)),
-                    const SizedBox(width: 4),
-                    Text(
-                      dateStr,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF9A7060)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    cert.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: Color(0xFF1C1C1C),
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    cert.issuingOrganization,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF9A7060),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 11, color: Color(0xFF9A7060)),
+                      const SizedBox(width: 4),
+                      Text(
+                        dateStr,
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF9A7060)),
+                      ),
+                      const SizedBox(width: 12),
+                      
+                      // ✅ Add a visual cue that there is a file to view
+                      if (cert.fileUrl != null) ...[
+                        const Icon(Icons.open_in_new, size: 11, color: Color(0xFF3DB87A)),
+                        const SizedBox(width: 2),
+                        const Text(
+                          'View File',
+                          style: TextStyle(
+                            fontSize: 11, 
+                            color: Color(0xFF3DB87A), 
+                            fontWeight: FontWeight.bold
+                          ),
+                        ),
+                      ]
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline, color: Color(0xFFE74C3C), size: 20),
-          ),
-        ],
+            // The IconButton will still catch taps for deleting without triggering the View
+            IconButton(
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline, color: Color(0xFFE74C3C), size: 20),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // The Bottom Sheet for Adding Certificates
 // ─────────────────────────────────────────────────────────────────────────────
@@ -281,27 +326,29 @@ class _AddCertificateSheetState extends State<_AddCertificateSheet> {
     if (picked != null) setState(() => _issueDate = picked);
   }
 
-  // Method to pick the file
-  Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-    );
+PlatformFile? _selectedFile; // store the whole PlatformFile, not just path
 
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _selectedFilePath = result.files.single.path;
-        _selectedFileName = result.files.single.name;
-      });
-    }
+Future<void> _pickFile() async {
+  FilePickerResult? result = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+    withData: true, // ✅ Required on web — loads bytes into memory
+  );
+
+  if (result != null) {
+    setState(() {
+      _selectedFile = result.files.single; // ✅ Store the whole object
+      _selectedFileName = result.files.single.name;
+    });
   }
+}
 
-  Future<void> _submit() async {
+Future<void> _submit() async {
     final title = _titleCtrl.text.trim();
     final org = _orgCtrl.text.trim();
     
-    // Validate text fields AND the file
-    if (title.isEmpty || org.isEmpty || _selectedFilePath == null) {
+    // ✅ FIX 1: Check _selectedFile instead of _selectedFilePath
+    if (title.isEmpty || org.isEmpty || _selectedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill all fields and attach a file.'),
@@ -314,12 +361,12 @@ class _AddCertificateSheetState extends State<_AddCertificateSheet> {
     
     setState(() => _submitting = true);
     try {
-      // Calls the real upload method from the CoachProvider
+      // ✅ FIX 2: Pass the whole PlatformFile object
       await context.read<CoachProvider>().uploadCertificate(
         title: title,
         issuingOrganization: org,
         issueDate: _issueDate,
-        filePath: _selectedFilePath!, // Pass the file path
+        file: _selectedFile!, // Changed this from filePath
       );
       widget.onAdded();
     } catch (e) {
@@ -334,7 +381,6 @@ class _AddCertificateSheetState extends State<_AddCertificateSheet> {
       );
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
