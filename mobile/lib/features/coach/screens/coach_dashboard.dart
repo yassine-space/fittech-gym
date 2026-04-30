@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For haptic feedback
-// --- KEEP YOUR ORIGINAL IMPORTS ---
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile/core/providers/coach_provider.dart';
+
 import 'clients_screen.dart';
 import 'programs_screen.dart';
-import 'schedule_screen.dart';
+import 'courses_screen.dart';
 import 'messages_screen.dart';
 import 'profile_screen.dart';
 
@@ -18,40 +20,53 @@ class CoachDashboard extends StatefulWidget {
 class _CoachDashboardState extends State<CoachDashboard> {
   int _selectedIndex = 0;
 
-  // --- RESTORED YOUR ACTUAL SCREENS ---
-  final List<Widget> _screens = [
-    const ClientsScreen(),
-    const ProgramsScreen(),
-    const ScheduleScreen(),
-    const MessagesScreen(),
-    const ProfileScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Load coach data on dashboard init
+    final provider = context.read<CoachProvider>();
+    provider.loadProfile();
+    provider.loadMembers();
+    provider.loadCourses();
+    provider.loadReservations();
+    provider.loadWaitlist();
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Screens are rebuilt to consume CoachProvider
+    final List<Widget> screens = [
+      const ClientsScreen(),
+      const ProgramsScreen(),
+      const CoachCoursesScreen(),
+      const MessagesScreen(),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
-      body: IndexedStack( // Using IndexedStack preserves the state of your pages
+      body: IndexedStack(
         index: _selectedIndex,
-        children: _screens,
+        children: screens,
       ),
       bottomNavigationBar: Container(
-        height: 85, 
+        height: 100,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.04),
               blurRadius: 10,
-              offset: const Offset(0, -5),
+              offset: const Offset(0, -2),
             ),
           ],
         ),
         child: SafeArea(
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(Icons.people_alt_rounded, 'CLIENTS', 0),
               _buildNavItem(Icons.fitness_center_rounded, 'PROGRAMS', 1),
-              _buildNavItem(Icons.calendar_month_rounded, 'SCHEDULE', 2),
+              _buildNavItem(Icons.menu_book_rounded, 'COURSES', 2),
               _buildNavItem(Icons.chat_bubble_rounded, 'MESSAGES', 3),
               _buildNavItem(Icons.person_rounded, 'PROFILE', 4),
             ],
@@ -63,56 +78,44 @@ class _CoachDashboardState extends State<CoachDashboard> {
 
   Widget _buildNavItem(IconData icon, String label, int index) {
     final isSelected = _selectedIndex == index;
-    const activeColor = Color(0xFFD44820);
-    const inactiveColor = Color(0xFFB09080);
+
+    const activeColor = Color(0xFFD45E36);
+    const activeBgColor = Color(0xFFFDECE7);
+    const inactiveColor = Color(0xFFAC9181);
 
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
-          HapticFeedback.selectionClick(); // Adds a nice physical feel
+          HapticFeedback.selectionClick();
           setState(() => _selectedIndex = index);
         },
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Indicator bar that slides/fades in
             AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              margin: const EdgeInsets.only(bottom: 4),
-              height: 4,
-              width: isSelected ? 18 : 0,
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: activeColor,
-                borderRadius: BorderRadius.circular(2),
+                color: isSelected ? activeBgColor : Colors.transparent,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 26,
+                color: isSelected ? activeColor : inactiveColor,
               ),
             ),
-            // Scaled Icon
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 1.0, end: isSelected ? 1.2 : 1.0),
-              duration: const Duration(milliseconds: 200),
-              builder: (context, scale, child) {
-                return Transform.scale(
-                  scale: scale,
-                  child: Icon(
-                    icon,
-                    size: 24,
-                    color: isSelected ? activeColor : inactiveColor,
-                  ),
-                );
-              },
-            ),
             const SizedBox(height: 4),
-            // Smooth text transition
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
+            Text(
+              label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                 color: isSelected ? activeColor : inactiveColor,
                 letterSpacing: 0.5,
               ),
-              child: Text(label),
             ),
           ],
         ),
