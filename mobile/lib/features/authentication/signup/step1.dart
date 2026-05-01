@@ -30,9 +30,9 @@ class _Step1State extends State<Step1> {
     super.initState();
     final provider = context.read<SignupProvider>();
     _first_nameController = TextEditingController(text: provider.data.first_name);
-    _last_nameController    = TextEditingController(text: provider.data.last_name);
-    _emailController  = TextEditingController(text: provider.data.email);
-    _phoneController  = TextEditingController(text: provider.data.phone);
+    _last_nameController = TextEditingController(text: provider.data.last_name);
+    _emailController = TextEditingController(text: provider.data.email);
+    _phoneController = TextEditingController(text: provider.data.phone);
 
     // Restore previously selected role index
     if (provider.data.role != null) {

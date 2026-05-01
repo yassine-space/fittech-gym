@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment
+from .models import CoachCertificate, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview
 
 
 # ─────────────────────────────────────────
@@ -14,7 +14,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "first_name", "last_name", "email",
-            "phone", "role", "profile_photo", "created_at", "is_active"
+            "phone", "role", "profile_photo", "created_at", "is_active","archived_at"
         ]
         read_only_fields = ["id", "created_at","role"]
 
@@ -183,6 +183,36 @@ class CoachActivateSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+class CoachReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoachReview
+        fields = ["id", "coach", "membre", "rating", "comment", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, data):
+        membre = data["membre"]
+        coach = data["coach"]
+
+        # Check the membre attended at least one course with this coach
+        attended = CourseReservation.objects.filter(
+            membre=membre,
+            course__coach=coach,
+            reservation_status="attended",
+        ).exists()
+
+        if not attended:
+            raise serializers.ValidationError(
+                "You can only review a coach after attending one of their courses."
+            )
+
+        return data
+
+
+class CoachCertificateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoachCertificate
+        fields = ["id", "coach", "title", "issuing_organization", "issue_date", "file", "created_at"]
+        read_only_fields = ["id", "created_at"]
 # ─────────────────────────────────────────
 # Subscription Plan Serializers
 # ─────────────────────────────────────────
@@ -266,3 +296,76 @@ class PaymentCreateSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError("Amount must be greater than 0.")
         return value
+    
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, validators=[validate_password])
+    new_password2 = serializers.CharField(required=True)
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["new_password2"]:
+            raise serializers.ValidationError({"new_password": "Passwords do not match."})
+        return attrs
+    
+class CourseSerializer(serializers.ModelSerializer):
+    spots_remaining = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Course
+        fields = [
+            "id", "coach", "title", "description", "level_required",
+            "max_participants", "duration_minutes", "date_time",
+            "created_at", "spots_remaining",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+    def get_spots_remaining(self, obj):
+        confirmed = obj.reservations.filter(reservation_status="confirmed").count()
+        return max(0, obj.max_participants - confirmed)
+
+
+class CourseReservationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseReservation
+        fields = ["id", "course", "membre", "reservation_status", "reservation_date"]
+        read_only_fields = ["id", "reservation_date"]
+
+    def validate(self, data):
+        course = data["course"]
+        membre = data.get("membre")
+
+        # Check for duplicate reservation
+        if CourseReservation.objects.filter(course=course, membre=membre).exists():
+            raise serializers.ValidationError("This membre already has a reservation for this course.")
+
+        # Check capacity
+        confirmed_count = course.reservations.filter(reservation_status="confirmed").count()
+        if confirmed_count >= course.max_participants:
+            raise serializers.ValidationError(
+                "Course is full. The membre should be added to the waitlist."
+            )
+
+        return data
+
+
+class CourseWaitlistSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseWaitlist
+        fields = ["id", "course", "membre", "position", "created_at"]
+        read_only_fields = ["id", "position", "created_at"]
+
+    def validate(self, data):
+        if CourseWaitlist.objects.filter(course=data["course"], membre=data["membre"]).exists():
+            raise serializers.ValidationError("This membre is already on the waitlist.")
+        return data
+
+    def create(self, validated_data):
+        course = validated_data["course"]
+        last_position = CourseWaitlist.objects.filter(course=course).count()
+        validated_data["position"] = last_position + 1
+        return super().create(validated_data)

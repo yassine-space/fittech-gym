@@ -1,28 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-
-void main() {
-  runApp(const FitTechApp());
-}
-
-class FitTechApp extends StatelessWidget {
-  const FitTechApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FitTech',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        fontFamily: 'Roboto',
-        scaffoldBackgroundColor: const Color(0xFFF9F3F3),
-      ),
-      home: const LoginScreen(),
-    );
-  }
-}
+import 'package:go_router/go_router.dart';
+import 'package:mobile/navigation/pages.dart';
+import 'package:mobile/core/services/apiservice.dart';
+import 'package:dio/dio.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -72,7 +52,6 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Logo icon (top-left) ──
               Container(
                 width: 64,
                 height: 64,
@@ -86,10 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   size: 32,
                 ),
               ),
-
               const SizedBox(height: 32),
-
-              // ── FitTech logo ──
               Center(
                 child: Image.asset(
                   'assets/images/login.png',
@@ -97,10 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   fit: BoxFit.contain,
                 ),
               ),
-
               const SizedBox(height: 28),
-
-              // ── Role selector tabs ──
               Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFFE0E0E0),
@@ -121,13 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             color: isSelected ? Colors.white : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                             boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.08),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ]
+                                ? [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2))]
                                 : [],
                           ),
                           child: Center(
@@ -146,45 +113,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   }),
                 ),
               ),
-
               const SizedBox(height: 28),
-
-              // ── Fields مع Animation ──
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 350),
                 transitionBuilder: (child, animation) {
                   final isGoingRight = _selectedRole > _previousRole;
-                  final offsetBegin = isGoingRight
-                      ? const Offset(1.0, 0)
-                      : const Offset(-1.0, 0);
-
+                  final offsetBegin = isGoingRight ? const Offset(1.0, 0) : const Offset(-1.0, 0);
                   return SlideTransition(
-                    position: Tween<Offset>(
-                      begin: offsetBegin,
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
-                    )),
-                    child: FadeTransition(
-                      opacity: animation,
-                      child: child,
+                    position: Tween<Offset>(begin: offsetBegin, end: Offset.zero).animate(
+                      CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
                     ),
+                    child: FadeTransition(opacity: animation, child: child),
                   );
                 },
                 child: Column(
                   key: ValueKey(_selectedRole),
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Email field ──
-                    const Text(
-                      'Email',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
+                    const Text('Email', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _emailController,
@@ -194,28 +140,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
                         filled: true,
                         fillColor: fieldBg,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                       ),
                     ),
-
                     const SizedBox(height: 20),
-
-                    // ── Password field ──
-                    const Text(
-                      'Password',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
+                    const Text('Password', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _passwordController,
@@ -225,34 +155,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
                         filled: true,
                         fillColor: fieldBg,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            color: Colors.black38,
-                          ),
-                          onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
-                          },
+                          icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.black38),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-
               const SizedBox(height: 36),
-
-              // ── Login button ──
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -261,70 +175,38 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryRed,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
                   child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Login',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                      : const Text('Login', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
                 ),
               ),
-
               const SizedBox(height: 20),
-
-              // ── Forgot password ──
               Center(
                 child: TextButton(
                   onPressed: _handleForgotPassword,
-                  child: const Text(
-                    'Mot de passe oublié ?',
-                    style: TextStyle(color: Colors.black45, fontSize: 14),
-                  ),
+                  child: const Text('Mot de passe oublié ?', style: TextStyle(color: Colors.black45, fontSize: 14)),
                 ),
               ),
-
-              // ── Sign up ──
               Center(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      "Pas encore membre ?  ",
-                      style: TextStyle(color: Colors.black45, fontSize: 14),
-                    ),
+                    const Text("Pas encore membre ?  ", style: TextStyle(color: Colors.black45, fontSize: 14)),
                     TextButton(
                       onPressed: _handleSignUp,
                       style: TextButton.styleFrom(
                         foregroundColor: primaryRed,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Text(
-                        "S'inscrire",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: const Text("S'inscrire", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
             ],
           ),
@@ -333,64 +215,93 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _handleLogin() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
 
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Remplis tous les champs')),
-      );
-      return;
-    }
+void _handleLogin() async {
+  final email = _emailController.text.trim();
+  final password = _passwordController.text;
 
-    setState(() => _isLoading = true);
-
-    try {
-      final response = await http.post(
-     Uri.parse('http://localhost:8000/api/auth/login/')
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (!mounted) return;
-
-      if (response.statusCode == 200) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', data['access']);
-        await prefs.setString('refresh_token', data['refresh']);
-        await prefs.setString('user_role', data['user']['role']);
-
-        final role = data['user']['role']; // 'membre' or 'coach'
-        debugPrint('Logged in as $role');
-
-        // TODO: Navigator.pushReplacement(...) حسب الـ role
-
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['detail'] ?? 'Erreur de connexion'),
-            backgroundColor: primaryRed,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible de joindre le serveur')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  if (email.isEmpty || password.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Remplis tous les champs')),
+    );
+    return;
   }
 
+  setState(() => _isLoading = true);
+
+  try {
+    // Use Apiservice instead of direct http call
+    final response = await Apiservice.instance.login(email, password);
+
+    if (!mounted) return;
+
+    if (response.statusCode == 200) {
+      final data = response.data;
+      debugPrint('✅ LOGIN OK - role: ${data['user']['role']}');
+
+      // Persist auth data and set AuthHolder for Dio-based API calls
+      await Apiservice.instance.saveAuthData(
+        accessToken: data['access'],
+        refreshToken: data['refresh'],
+        userId: data['user']['id'],
+        userRole: data['user']['role'],
+      );
+
+      final role = data['user']['role'];
+      if (!mounted) return;
+
+      switch (role) {
+        case 'membre':
+          context.go(Pages.membreDashboard, extra: email);
+          break;
+        case 'coach':
+          context.go(Pages.coachDashboard, extra: email);
+          break;
+        default:
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Role inconnu: $role')),
+          );
+      }
+    }
+  } on DioException catch (e) {
+    debugPrint('❌ ERROR: $e');
+    if (!mounted) return;
+    
+    String errorMessage = 'Erreur de connexion';
+    if (e.response?.statusCode == 403) {
+      errorMessage = e.response?.data?['detail'] ?? 'Accès refusé';
+    } else if (e.response?.statusCode == 401) {
+      errorMessage = 'Email ou mot de passe incorrect';
+    } else if (e.response?.data?['detail'] != null) {
+      errorMessage = e.response!.data['detail'];
+    } else if (e.type == DioExceptionType.connectionTimeout || 
+               e.type == DioExceptionType.connectionError) {
+      errorMessage = 'Impossible de joindre le serveur';
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(errorMessage),
+        backgroundColor: primaryRed,
+      ),
+    );
+  } catch (e) {
+    debugPrint('❌ ERROR: $e');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Impossible de joindre le serveur')),
+    );
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
+}
+
+
   void _handleForgotPassword() {
-    debugPrint('Forgot password tapped');
+context.go(Pages.forgotPassword);
   }
 
   void _handleSignUp() {
-    debugPrint('Sign up tapped');
+     context.go(Pages.singup);
   }
 }

@@ -4,7 +4,8 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 from django.utils import timezone
 from datetime import date 
-
+import secrets
+from django.core.validators import MinValueValidator, MaxValueValidator
 # ─────────────────────────────────────────
 # Custom User Manager
 # ─────────────────────────────────────────
@@ -59,6 +60,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(default=timezone.now)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    archived_at = models.DateTimeField(blank=True, null=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]
@@ -67,21 +69,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"
-
-
-# ─────────────────────────────────────────
-# Membre
-# ─────────────────────────────────────────
-class Membre(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="membre_profile")
-    date_of_birth = models.DateField(blank=True, null=True)
-    health_goal = models.TextField(blank=True, null=True)
-    medical_restrictions = models.TextField(blank=True, null=True)
-    join_date = models.DateField(default=date.today)
-
-    def __str__(self):
-        return f"Membre: {self.user.first_name} {self.user.last_name}"
 
 
 # ─────────────────────────────────────────
@@ -97,6 +84,21 @@ class Coach(models.Model):
     def __str__(self):
         return f"Coach: {self.user.first_name} {self.user.last_name}"
 
+# ─────────────────────────────────────────
+# Membre
+# ─────────────────────────────────────────
+class Membre(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="membre_profile")
+    date_of_birth = models.DateField(blank=True, null=True)
+    health_goal = models.TextField(blank=True, null=True)
+    medical_restrictions = models.TextField(blank=True, null=True)
+    join_date = models.DateField(default=date.today)
+    coach = models.ForeignKey(Coach,on_delete=models.SET_NULL,null=True,blank=True,related_name="assigned_membres",)
+
+    def __str__(self):
+        return f"Membre: {self.user.first_name} {self.user.last_name}"
+
 
 # ─────────────────────────────────────────
 # Subscription Plan
@@ -108,10 +110,16 @@ class SubscriptionPlan(models.Model):
         ("yearly", "Yearly"),
         ("sessions", "Sessions Pack"),
     ]
+    PLAN_TIER_CHOICES = [
+        ("basic", "Basic"),
+        ("advanced", "Advanced"),
+        ("full", "Full Options"),
+    ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     type = models.CharField(max_length=20, choices=PLAN_TYPE_CHOICES)
+    tier = models.CharField(max_length=20, choices=PLAN_TIER_CHOICES, default="basic")
     price = models.DecimalField(max_digits=10, decimal_places=2)
     sessions_count = models.PositiveIntegerField(default=0)
     duration_days = models.PositiveIntegerField(default=30)
@@ -119,7 +127,7 @@ class SubscriptionPlan(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
-        return f"{self.name} - {self.type}"
+        return f"{self.name} - {self.type} - {self.tier}"
 
 
 # ─────────────────────────────────────────
@@ -175,3 +183,107 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment #{self.invoice_number} - {self.membre} ({self.payment_status})"
+
+
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reset_tokens")
+    token = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    is_used = models.BooleanField(default=False)
+
+    def is_valid(self):
+        from datetime import timedelta
+        expiry = self.created_at + timedelta(hours=1)
+        return not self.is_used and timezone.now() < expiry
+
+    def __str__(self):
+        return f"Reset token for {self.user.email}"
+    
+
+class Course(models.Model):
+    LEVEL_CHOICES = [
+        ("beginner", "Beginner"),
+        ("intermediate", "Intermediate"),
+        ("advanced", "Advanced"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coach = models.ForeignKey("Coach", on_delete=models.CASCADE, related_name="courses")
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    level_required = models.CharField(max_length=20, choices=LEVEL_CHOICES, default="beginner")
+    max_participants = models.PositiveIntegerField()
+    duration_minutes = models.PositiveIntegerField()
+    date_time = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+
+class CourseReservation(models.Model):
+    STATUS_CHOICES = [
+        ("confirmed", "Confirmed"),
+        ("cancelled", "Cancelled"),
+        ("attended", "Attended"),
+        ("no_show", "No Show"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="reservations")
+    membre = models.ForeignKey("Membre", on_delete=models.CASCADE, related_name="reservations")
+    reservation_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="confirmed")
+    reservation_date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("course", "membre")  # one reservation per membre per course
+
+    def __str__(self):
+        return f"{self.membre} → {self.course}"
+
+
+class CourseWaitlist(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="waitlist")
+    membre = models.ForeignKey("Membre", on_delete=models.CASCADE, related_name="waitlist_entries")
+    position = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("course", "membre")
+        ordering = ["position"]
+
+    def __str__(self):
+        return f"{self.membre} waiting #{self.position} for {self.course}"
+    
+
+
+class CoachReview(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coach = models.ForeignKey("Coach", on_delete=models.CASCADE, related_name="reviews")
+    membre = models.ForeignKey("Membre", on_delete=models.CASCADE, related_name="reviews")
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("coach", "membre")
+
+    def __str__(self):
+        return f"{self.membre} → {self.coach} ({self.rating}★)"
+
+
+class CoachCertificate(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coach = models.ForeignKey("Coach", on_delete=models.CASCADE, related_name="certificates")
+    title = models.CharField(max_length=255)
+    issuing_organization = models.CharField(max_length=255)
+    issue_date = models.DateField()
+    file = models.FileField(upload_to="certificates/")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} — {self.coach}"

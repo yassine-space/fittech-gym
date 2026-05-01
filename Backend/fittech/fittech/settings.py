@@ -18,17 +18,22 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+load_dotenv()
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure--1xhiwix)q-$m2o44+2a7((jwckmufp&yqw3r=wsb*-m^)iio^"
+#SECRET_KEY = "django-insecure--1xhiwix)q-$m2o44+2a7((jwckmufp&yqw3r=wsb*-m^)iio^"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
-ALLOWED_HOSTS = []
+DEBUG =True
+#DEBUG = os.getenv("DEBUG", "False") == "True"
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
 
 
 AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
@@ -46,9 +51,11 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     "fitapi",
     "rest_framework_simplejwt.token_blacklist",
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -89,15 +96,15 @@ AUTH_USER_MODEL = "fitapi.User"
 # }
 # Add these at the top of your settings.py
 
-load_dotenv()
+
 
 # Replace the DATABASES section of your settings.py with this
-tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
-
+database_url = os.getenv("DATABASE_URL")
+tmpPostgres = urlparse(database_url)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': tmpPostgres.path.replace('/', ''),
+        'NAME': tmpPostgres.path[1:],
         'USER': tmpPostgres.username,
         'PASSWORD': tmpPostgres.password,
         'HOST': tmpPostgres.hostname,
@@ -145,4 +152,16 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
+
 STATIC_URL = "static/"
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'fittech@gmail.com'
+EMAIL_HOST_PASSWORD = 'hvci lqya cxcu ajfg'  # Gmail app password not your real password
+FRONTEND_URL = 'http://localhost:4200'  
+
+CORS_ALLOW_ALL_ORIGINS = True

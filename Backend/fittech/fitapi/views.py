@@ -1,11 +1,14 @@
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
-from rest_framework.views import APIView
+from rest_framework.views import APIView, PermissionDenied
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
+from django.core.mail import send_mail
+from django.conf import settings
+import secrets
 
-from .models import User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment
+from .models import CoachCertificate, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview
 from .serializers import (
     UserSerializer,
     RegisterSerializer,
@@ -20,8 +23,15 @@ from .serializers import (
     MembreSubscriptionCreateSerializer,
     PaymentSerializer,
     PaymentCreateSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer,
+    CourseSerializer, 
+    CourseReservationSerializer, 
+    CourseWaitlistSerializer,
+    CoachReviewSerializer,
+    CoachCertificateSerializer,
 )
-
+from django.db import transaction
 
 # ─────────────────────────────────────────
 # Permissions
@@ -220,6 +230,79 @@ class ChangePasswordView(APIView):
             "detail": "Password updated successfully. Please log in again."
         })
 
+class ForgotPasswordView(APIView):
+    """
+    POST /auth/forgot-password/
+    Sends a password reset link to the user's email.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+
+        # always return 200 even if email doesn't exist (security best practice)
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"detail": "If this email exists you will receive a reset link."})
+
+        # invalidate old tokens
+        PasswordResetToken.objects.filter(user=user, is_used=False).update(is_used=True)
+
+        # generate new token
+        token = secrets.token_urlsafe(32)
+        PasswordResetToken.objects.create(user=user, token=token)
+
+        # build reset link
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+
+        # send email
+        send_mail(
+            subject="Reset your FitTech password",
+            message=f"Hi {user.first_name},\n\nClick the link below to reset your password:\n{reset_link}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, ignore this email.",
+            from_email=settings.EMAIL_HOST_USER,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+
+        return Response({"detail": "If this email exists you will receive a reset link."})
+
+
+class ResetPasswordView(APIView):
+    """
+    POST /auth/reset-password/
+    Validates token and sets new password.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        token_str = serializer.validated_data["token"]
+
+        try:
+            reset_token = PasswordResetToken.objects.select_related("user").get(token=token_str)
+        except PasswordResetToken.DoesNotExist:
+            return Response({"detail": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not reset_token.is_valid():
+            return Response({"detail": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = reset_token.user
+        user.set_password(serializer.validated_data["new_password"])
+        user.save()
+
+        # mark token as used
+        reset_token.is_used = True
+        reset_token.save()
+
+        return Response({"detail": "Password reset successfully. You can now log in."})
+
+
 class MeView(generics.RetrieveUpdateAPIView):
     """
     GET /auth/me/   — retrieve own profile
@@ -259,7 +342,20 @@ class MembreListCreateView(generics.ListCreateAPIView):
     GET  /membres/   — list all membres (admin/coach)
     POST /membres/   — create a membre profile (admin)
     """
-    queryset = Membre.objects.select_related("user").all()
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.role == "admin":
+            return Membre.objects.select_related("user").all()
+
+        if user.role == "coach":
+            coach = user.coach_profile
+            membre_ids = CourseReservation.objects.filter(
+                course__coach=coach,
+            ).values_list("membre_id", flat=True).distinct()
+            return Membre.objects.select_related("user").filter(id__in=membre_ids)
+
+        return Membre.objects.none()
 
     def get_serializer_class(self):
         return MembreCreateSerializer if self.request.method == "POST" else MembreSerializer
@@ -366,6 +462,49 @@ class PendingCoachListView(generics.ListAPIView):
         return Coach.objects.select_related("user").filter(is_active=False)
 
 
+class CoachReviewListCreateView(generics.ListCreateAPIView):
+    serializer_class = CoachReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return CoachReview.objects.filter(coach=self.kwargs["coach_pk"])
+
+
+class CoachReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = CoachReviewSerializer
+    permission_classes = [IsOwnerOrAdmin]
+
+    def get_queryset(self):
+        return CoachReview.objects.filter(coach=self.kwargs["coach_pk"])
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.IsAuthenticated()]
+        return [IsOwnerOrAdmin()]
+
+
+class CoachCertificateListCreateView(generics.ListCreateAPIView):
+    serializer_class = CoachCertificateSerializer
+
+    def get_queryset(self):
+        return CoachCertificate.objects.filter(coach=self.kwargs["coach_pk"])
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.IsAuthenticated()]
+        return [IsCoach()]
+
+
+class CoachCertificateDetailView(generics.RetrieveDestroyAPIView):
+    serializer_class = CoachCertificateSerializer
+
+    def get_queryset(self):
+        return CoachCertificate.objects.filter(coach=self.kwargs["coach_pk"])
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.IsAuthenticated()]
+        return [IsCoach()]
 # ─────────────────────────────────────────
 # Subscription Plan Views
 # ─────────────────────────────────────────
@@ -407,6 +546,13 @@ class MembreSubscriptionListCreateView(generics.ListCreateAPIView):
 
     def get_permissions(self):
         return [IsAdmin()] if self.request.method == "POST" else [permissions.IsAuthenticated()]
+    
+    def perform_create(self, serializer):
+        subscription = serializer.save()
+        # reset coach assignment on new subscription
+        membre = subscription.membre
+        membre.coach = None
+        membre.save()
 
 
 class MembreSubscriptionDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -430,7 +576,48 @@ class MySubscriptionsView(generics.ListAPIView):
             membre__user=self.request.user
         )
 
+class AssignCoachView(APIView):
+    """
+    POST /membres/me/assign-coach/   — assign a coach
+    DELETE /membres/me/assign-coach/ — unassign (on plan renewal)
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
+    def _get_membre_and_validate_plan(self, request):
+        membre = get_object_or_404(Membre, user=request.user)
+
+        active_sub = MembreSubscription.objects.filter(
+            membre=membre,
+            status="active",
+        ).select_related("plan").first()
+
+        if not active_sub or active_sub.plan.tier != "full":
+            raise PermissionDenied("Coach assignment requires an active full options plan.")
+
+        return membre, active_sub
+
+    def post(self, request):
+        membre, active_sub = self._get_membre_and_validate_plan(request)
+
+        if membre.coach is not None:
+            return Response(
+                {"detail": "You already have a coach. You can only switch after your plan ends."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        coach_id = request.data.get("coach")
+        coach = get_object_or_404(Coach, pk=coach_id, is_active=True)
+
+        membre.coach = coach
+        membre.save()
+
+        return Response({"detail": f"Coach assigned successfully."})
+
+    def delete(self, request):
+        membre, _ = self._get_membre_and_validate_plan(request)
+        membre.coach = None
+        membre.save()
+        return Response({"detail": "Coach unassigned."})
 # ─────────────────────────────────────────
 # Payment Views
 # ─────────────────────────────────────────
@@ -472,3 +659,93 @@ class MyPaymentsView(generics.ListAPIView):
         return Payment.objects.select_related("membre__user", "subscription__plan").filter(
             membre__user=self.request.user
         )
+    
+# Course Views
+class CourseListCreateView(generics.ListCreateAPIView):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAdminOrCoach()]
+        return [permissions.IsAuthenticated()]
+
+
+class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.IsAuthenticated()]
+        return [IsAdminOrCoach()]
+
+
+class CourseReservationListCreateView(generics.ListCreateAPIView):
+    serializer_class = CourseReservationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.role == "admin":
+            return CourseReservation.objects.all()
+        return CourseReservation.objects.filter(membre__user=self.request.user)
+
+
+class CourseReservationDetailView(generics.RetrieveUpdateAPIView):
+    queryset = CourseReservation.objects.all()
+    serializer_class = CourseReservationSerializer
+    permission_classes = [IsOwnerOrAdmin]
+
+
+class CancelReservationView(APIView):
+    """
+    PATCH /reservations/<pk>/cancel/
+    Cancels a reservation and promotes the first waitlist entry.
+    """
+    permission_classes = [IsOwnerOrAdmin]
+
+    def patch(self, request, pk):
+        reservation = get_object_or_404(CourseReservation, pk=pk)
+
+        with transaction.atomic():
+            reservation.reservation_status = "cancelled"
+            reservation.save()
+
+            # Promote next person from waitlist
+            next_entry = (
+                CourseWaitlist.objects.filter(course=reservation.course)
+                .order_by("position")
+                .first()
+            )
+            if next_entry:
+                CourseReservation.objects.create(
+                    course=reservation.course,
+                    membre=next_entry.membre,
+                    reservation_status="confirmed",
+                )
+                next_entry.delete()
+                # Re-number remaining waitlist positions
+                for i, entry in enumerate(
+                    CourseWaitlist.objects.filter(course=reservation.course).order_by("position"),
+                    start=1,
+                ):
+                    entry.position = i
+                    entry.save()
+
+        return Response({"detail": "Reservation cancelled."})
+
+
+class CourseWaitlistListCreateView(generics.ListCreateAPIView):
+    serializer_class = CourseWaitlistSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.role == "admin":
+            return CourseWaitlist.objects.all()
+        return CourseWaitlist.objects.filter(membre__user=self.request.user)
+
+
+class CourseWaitlistDetailView(generics.RetrieveDestroyAPIView):
+    queryset = CourseWaitlist.objects.all()
+    serializer_class = CourseWaitlistSerializer
+    permission_classes = [IsOwnerOrAdmin]
