@@ -222,7 +222,7 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubscriptionPlan
         fields = [
-            "id", "name", "type", "price", "sessions_count",
+            "id", "name", "type", "price","tier", "sessions_count",
             "duration_days", "auto_renew", "created_at"
         ]
         read_only_fields = ["id", "created_at"]
@@ -255,7 +255,7 @@ class MembreSubscriptionCreateSerializer(serializers.ModelSerializer):
             "id", "membre", "plan", "start_date", "end_date",
             "status", "remaining_sessions", "pause_days_used"
         ]
-        read_only_fields = ["id"]
+        read_only_fields = ["id","created_at", "remaining_sessions"]
 
     def validate(self, attrs):
         if attrs["start_date"] >= attrs["end_date"]:

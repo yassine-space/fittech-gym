@@ -287,3 +287,27 @@ class CoachCertificate(models.Model):
 
     def __str__(self):
         return f"{self.title} — {self.coach}"
+    
+
+
+class GymDailyToken(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    token = models.CharField(max_length=64, unique=True)
+    date = models.DateField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Token for {self.date}"
+
+
+class GymEntry(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    membre = models.ForeignKey("Membre", on_delete=models.CASCADE, related_name="gym_entries")
+    date = models.DateField()
+    entered_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("membre", "date")  # one entry per member per day
+
+    def __str__(self):
+        return f"{self.membre} — {self.date}"

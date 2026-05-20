@@ -4,10 +4,12 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     # Auth
     AssignCoachView,
+    CoachAssignedMembresView,
     CoachReviewDetailView,
     CoachReviewListCreateView,
     CoachCertificateListCreateView,
     CoachCertificateDetailView,
+    GymCheckInView,
     RegisterView,
     LoginView,
     LogoutView,
@@ -67,7 +69,7 @@ urlpatterns = [
     # ─────────────────────────────────────────
     # Membres
     # ─────────────────────────────────────────
-    path("membres/",                MembreListCreateView.as_view(), name="membre-list"),
+    path("membres/",                MembreListCreateView.as_view(), name="membre-list"),  #for the coaches to see the list of reserved membres and admin to see all membres
     path("membres/me/assign-coach/", AssignCoachView.as_view()),
     path("membres/me/",             MyMembreProfileView.as_view(),  name="membre-me"),
     path("membres/<uuid:pk>/",      MembreDetailView.as_view(),     name="membre-detail"),
@@ -77,6 +79,7 @@ urlpatterns = [
     # ─────────────────────────────────────────
     path("coaches/",                CoachListCreateView.as_view(),  name="coach-list"),
     path("coaches/me/",             MyCoachProfileView.as_view(),   name="coach-me"),
+    path("coaches/me/membres/", CoachAssignedMembresView.as_view(), name="coach-assigned-membres"),  #list of membres assigned to the coach
     path("coaches/<uuid:pk>/",      CoachDetailView.as_view(),      name="coach-detail"),
     path("coaches/<uuid:pk>/activate/", CoachActivateView.as_view(), name="coach-activate"),
     path("coaches/pending/",        PendingCoachListView.as_view(), name="coach-pending"),
@@ -112,6 +115,7 @@ urlpatterns = [
     path("reservations/", CourseReservationListCreateView.as_view()),
     path("reservations/<uuid:pk>/", CourseReservationDetailView.as_view()),
     path("reservations/<uuid:pk>/cancel/", CancelReservationView.as_view()),
+    path("gym/checkin/", GymCheckInView.as_view()),
 
     # Waitlist
     path("waitlist/", CourseWaitlistListCreateView.as_view()),

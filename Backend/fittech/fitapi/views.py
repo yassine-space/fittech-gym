@@ -7,8 +7,9 @@ from django.shortcuts import get_object_or_404
 from django.core.mail import send_mail
 from django.conf import settings
 import secrets
+from django.utils import timezone
 
-from .models import CoachCertificate, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview
+from .models import CoachCertificate, GymDailyToken, GymEntry, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview
 from .serializers import (
     UserSerializer,
     RegisterSerializer,
@@ -350,10 +351,13 @@ class MembreListCreateView(generics.ListCreateAPIView):
 
         if user.role == "coach":
             coach = user.coach_profile
-            membre_ids = CourseReservation.objects.filter(
+            reserved_ids = CourseReservation.objects.filter(
                 course__coach=coach,
             ).values_list("membre_id", flat=True).distinct()
-            return Membre.objects.select_related("user").filter(id__in=membre_ids)
+
+            return Membre.objects.select_related("user").filter(
+                id__in=reserved_ids
+            )
 
         return Membre.objects.none()
 
@@ -505,6 +509,21 @@ class CoachCertificateDetailView(generics.RetrieveDestroyAPIView):
         if self.request.method == "GET":
             return [permissions.IsAuthenticated()]
         return [IsCoach()]
+    
+
+
+class CoachAssignedMembresView(generics.ListAPIView):
+    """
+    GET /coaches/me/membres/ — directly assigned membres (full profile)
+    """
+    permission_classes = [IsCoach]
+    serializer_class = MembreSerializer
+
+    def get_queryset(self):
+        coach = get_object_or_404(Coach, user=self.request.user)
+        return Membre.objects.select_related("user").filter(coach=coach)
+    
+
 # ─────────────────────────────────────────
 # Subscription Plan Views
 # ─────────────────────────────────────────
@@ -548,12 +567,13 @@ class MembreSubscriptionListCreateView(generics.ListCreateAPIView):
         return [IsAdmin()] if self.request.method == "POST" else [permissions.IsAuthenticated()]
     
     def perform_create(self, serializer):
-        subscription = serializer.save()
-        # reset coach assignment on new subscription
+        plan = serializer.validated_data["plan"]
+        remaining = 0 if plan.tier == "full" else plan.sessions_count
+        subscription = serializer.save(remaining_sessions=remaining)
+    # reset coach assignment on new subscription
         membre = subscription.membre
         membre.coach = None
         membre.save()
-
 
 class MembreSubscriptionDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/DELETE /subscriptions/<pk>/"""
@@ -749,3 +769,60 @@ class CourseWaitlistDetailView(generics.RetrieveDestroyAPIView):
     queryset = CourseWaitlist.objects.all()
     serializer_class = CourseWaitlistSerializer
     permission_classes = [IsOwnerOrAdmin]
+
+
+
+class GymCheckInView(APIView):
+    """
+    POST /gym/checkin/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        token = request.data.get("token")
+        today = timezone.now().date()
+
+        # 1. validate token
+        daily_token = GymDailyToken.objects.filter(date=today).first()
+        if not daily_token or daily_token.token != token:
+            return Response(
+                {"detail": "Invalid or expired QR code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2. get membre
+        membre = get_object_or_404(Membre, user=request.user)
+
+        # 3. check active subscription
+        active_sub = MembreSubscription.objects.filter(
+            membre=membre,
+            status="active",
+        ).select_related("plan").first()
+
+        if not active_sub:
+            return Response(
+                {"detail": "No active subscription."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # 4. check already entered today (basic/advanced only)
+        if active_sub.plan.tier != "full":
+            already_entered = GymEntry.objects.filter(membre=membre, date=today).exists()
+            if already_entered:
+                return Response(
+                    {"detail": "You have already checked in today."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        # 5. log entry
+        GymEntry.objects.get_or_create(membre=membre, date=today)
+
+        # 6. decrease session for basic/advanced
+        if active_sub.plan.tier != "full":
+            active_sub.remaining_sessions -= 1
+            if active_sub.remaining_sessions <= 0:
+                active_sub.remaining_sessions = 0
+                active_sub.status = "expired"
+            active_sub.save()
+
+        return Response({"detail": "Check-in successful. Welcome!"})

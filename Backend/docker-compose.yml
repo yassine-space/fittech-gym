@@ -13,7 +13,17 @@ services:
     env_file:
       - ./fittech/.env
     restart: always
-
+  cron:
+    build: ./fittech
+    command: >
+      sh -c "echo '0 0 * * * cd /app && python manage.py generate_daily_token >> /var/log/cron.log 2>&1' | crontab - && cron -f"
+    volumes:
+      - ./fittech:/app
+    env_file:
+      - ./fittech/.env
+    restart: always
 volumes:
   static_volume:
   media_volume:
+
+
