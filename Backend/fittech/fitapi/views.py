@@ -9,7 +9,7 @@ from django.conf import settings
 import secrets
 from django.utils import timezone
 
-from .models import CoachCertificate, GymDailyToken, GymEntry, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview
+from .models import CoachCertificate, GymDailyToken, GymEntry, Message, Conversation,User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview
 from .serializers import (
     UserSerializer,
     RegisterSerializer,
@@ -31,6 +31,8 @@ from .serializers import (
     CourseWaitlistSerializer,
     CoachReviewSerializer,
     CoachCertificateSerializer,
+    ConversationSerializer,
+    MessageSerializer
 )
 from django.db import transaction
 
@@ -826,3 +828,76 @@ class GymCheckInView(APIView):
             active_sub.save()
 
         return Response({"detail": "Check-in successful. Welcome!"})
+    
+
+
+class ConversationListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /conversations/        — list my conversations
+    POST /conversations/        — start a new conversation
+    """
+    serializer_class = ConversationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == "coach":
+            return Conversation.objects.filter(coach__user=user)
+        if user.role == "membre":
+            return Conversation.objects.filter(membre__user=user)
+        return Conversation.objects.all()
+
+    def perform_create(self, serializer):
+        coach = serializer.validated_data["coach"]
+        membre = serializer.validated_data["membre"]
+
+        # Verify the membre is directly assigned to this coach
+        if membre.coach != coach:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("A conversation can only be created between a coach and their assigned member.")
+
+        serializer.save()
+
+
+class MessageListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /conversations/<id>/messages/  — list messages (excludes deleted)
+    POST /conversations/<id>/messages/  — send a text message
+    """
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Auto-delete messages older than 90 days
+        cutoff = timezone.now() - timezone.timedelta(days=90)
+        Message.objects.filter(created_at__lt=cutoff).delete()
+
+        return Message.objects.filter(
+            conversation_id=self.kwargs["conversation_id"],
+            deleted_at__isnull=True,
+        )
+
+    def perform_create(self, serializer):
+        conversation = get_object_or_404(Conversation, pk=self.kwargs["conversation_id"])
+        serializer.save(sender=self.request.user, conversation=conversation)
+
+
+class MessageDeleteView(generics.UpdateAPIView):
+    """
+    PATCH /conversations/<conversation_id>/messages/<pk>/delete/
+    Soft deletes a message — only the sender can delete their own messages.
+    """
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Message.objects.filter(
+            conversation_id=self.kwargs["conversation_id"],
+            sender=self.request.user,
+        )
+
+    def patch(self, request, *args, **kwargs):
+        message = self.get_object()
+        message.deleted_at = timezone.now()
+        message.save()
+        return Response({"detail": "Message deleted."})

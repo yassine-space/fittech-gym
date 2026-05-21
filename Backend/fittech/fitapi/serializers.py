@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import CoachCertificate, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview
+from .models import CoachCertificate, Conversation, Message, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview
 
 
 # ─────────────────────────────────────────
@@ -369,3 +369,43 @@ class CourseWaitlistSerializer(serializers.ModelSerializer):
         last_position = CourseWaitlist.objects.filter(course=course).count()
         validated_data["position"] = last_position + 1
         return super().create(validated_data)
+    
+
+
+class MessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Message
+        fields = ["id", "conversation", "sender", "message_type", "content", "file", "is_read", "deleted_at", "created_at"]
+        read_only_fields = ["id", "sender", "is_read", "deleted_at", "created_at"]
+
+    def validate(self, data):
+        message_type = data.get("message_type", "text")
+        content = data.get("content", "")
+        file = data.get("file")
+
+        if message_type == "text" and not content:
+            raise serializers.ValidationError("Text messages require content.")
+
+        if message_type in ("image", "file") and not file:
+            raise serializers.ValidationError("Image and file messages require a file.")
+
+        return data
+
+
+class ConversationSerializer(serializers.ModelSerializer):
+    last_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Conversation
+        fields = ["id", "coach", "membre", "created_at", "last_message"]
+        read_only_fields = ["id", "created_at"]
+
+    def get_last_message(self, obj):
+        message = obj.messages.filter(deleted_at__isnull=True).last()
+        if message:
+            return {
+                "content": message.content if message.message_type == "text" else f"[{message.message_type}]",
+                "created_at": message.created_at.isoformat(),
+                "is_read": message.is_read,
+            }
+        return None

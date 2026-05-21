@@ -58,6 +58,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="membre")
     profile_photo = models.ImageField(upload_to="profile_photos/", blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
+    is_online = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     archived_at = models.DateTimeField(blank=True, null=True)
@@ -311,3 +312,41 @@ class GymEntry(models.Model):
 
     def __str__(self):
         return f"{self.membre} — {self.date}"
+    
+
+
+class Conversation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coach = models.ForeignKey("Coach", on_delete=models.CASCADE, related_name="conversations")
+    membre = models.ForeignKey("Membre", on_delete=models.CASCADE, related_name="conversations")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("coach", "membre")
+
+    def __str__(self):
+        return f"{self.coach} ↔ {self.membre}"
+
+
+class Message(models.Model):
+    MESSAGE_TYPE_CHOICES = [
+        ("text", "Text"),
+        ("image", "Image"),
+        ("file", "File"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey("User", on_delete=models.CASCADE, related_name="sent_messages")
+    message_type = models.CharField(max_length=10, choices=MESSAGE_TYPE_CHOICES, default="text")
+    content = models.TextField(blank=True)
+    file = models.FileField(upload_to="chat/files/", blank=True, null=True)
+    is_read = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.sender} → {self.conversation} ({self.message_type})"

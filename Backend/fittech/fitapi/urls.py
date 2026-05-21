@@ -9,7 +9,10 @@ from .views import (
     CoachReviewListCreateView,
     CoachCertificateListCreateView,
     CoachCertificateDetailView,
+    ConversationListCreateView,
     GymCheckInView,
+    MessageDeleteView,
+    MessageListCreateView,
     RegisterView,
     LoginView,
     LogoutView,
@@ -120,4 +123,10 @@ urlpatterns = [
     # Waitlist
     path("waitlist/", CourseWaitlistListCreateView.as_view()),
     path("waitlist/<uuid:pk>/", CourseWaitlistDetailView.as_view()),
+
+    # Chat
+
+    path("conversations/", ConversationListCreateView.as_view()),
+    path("conversations/<uuid:conversation_id>/messages/", MessageListCreateView.as_view()),
+    path("conversations/<uuid:conversation_id>/messages/<uuid:pk>/delete/", MessageDeleteView.as_view()),
 ]
