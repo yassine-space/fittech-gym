@@ -11,6 +11,8 @@ from .views import (
     CoachCertificateDetailView,
     ConversationListCreateView,
     GymCheckInView,
+    MachineDetailView,
+    MachineListCreateView,
     MessageDeleteView,
     MessageListCreateView,
     RegisterView,
@@ -48,6 +50,9 @@ from .views import (
     CourseListCreateView, CourseDetailView,
     CourseReservationListCreateView, CourseReservationDetailView, CancelReservationView,
     CourseWaitlistListCreateView, CourseWaitlistDetailView,
+    WorkoutLogDetailView,
+    WorkoutLogListCreateView,
+    WorkoutProgressView,
 )
 
 urlpatterns = [
@@ -111,22 +116,31 @@ urlpatterns = [
     path("payments/me/",            MyPaymentsView.as_view(),         name="payment-me"),
     path("payments/<uuid:pk>/",     PaymentDetailView.as_view(),      name="payment-detail"),
     # Courses
-    path("courses/", CourseListCreateView.as_view()),
-    path("courses/<uuid:pk>/", CourseDetailView.as_view()),
+    path("courses/", CourseListCreateView.as_view(), name="course-list"),
+    path("courses/<uuid:pk>/", CourseDetailView.as_view(), name="course-detail"),
 
     # Reservations
-    path("reservations/", CourseReservationListCreateView.as_view()),
-    path("reservations/<uuid:pk>/", CourseReservationDetailView.as_view()),
+    path("reservations/", CourseReservationListCreateView.as_view(), name="reservation-list"),
+    path("reservations/<uuid:pk>/", CourseReservationDetailView.as_view(), name="reservation-detail"),
     path("reservations/<uuid:pk>/cancel/", CancelReservationView.as_view()),
     path("gym/checkin/", GymCheckInView.as_view()),
 
     # Waitlist
-    path("waitlist/", CourseWaitlistListCreateView.as_view()),
-    path("waitlist/<uuid:pk>/", CourseWaitlistDetailView.as_view()),
+    path("waitlist/", CourseWaitlistListCreateView.as_view(), name="waitlist-list"),
+    path("waitlist/<uuid:pk>/", CourseWaitlistDetailView.as_view(), name="waitlist-detail"),
 
     # Chat
 
-    path("conversations/", ConversationListCreateView.as_view()),
-    path("conversations/<uuid:conversation_id>/messages/", MessageListCreateView.as_view()),
-    path("conversations/<uuid:conversation_id>/messages/<uuid:pk>/delete/", MessageDeleteView.as_view()),
+    path("conversations/", ConversationListCreateView.as_view(), name="conversation-list"),
+    path("conversations/<uuid:conversation_id>/messages/", MessageListCreateView.as_view(), name="message-list"),
+    path("conversations/<uuid:conversation_id>/messages/<uuid:pk>/delete/", MessageDeleteView.as_view(), name="message-delete"),
+
+
+
+    # Workout Logs
+    path("machines/", MachineListCreateView.as_view(), name="machine-list"),
+    path("machines/<uuid:pk>/", MachineDetailView.as_view(), name="machine-detail"),
+    path("workouts/", WorkoutLogListCreateView.as_view(), name="workout-list"),
+    path("workouts/progress/", WorkoutProgressView.as_view(), name="workout-progress"),  # before workouts/<pk>/
+    path("workouts/<uuid:pk>/", WorkoutLogDetailView.as_view(), name="workout-detail"),
 ]

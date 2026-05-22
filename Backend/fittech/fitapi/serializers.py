@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import CoachCertificate, Conversation, Message, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview
+from .models import CoachCertificate, Conversation, Machine, Message, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog, WorkoutSet
 
 
 # ─────────────────────────────────────────
@@ -409,3 +409,51 @@ class ConversationSerializer(serializers.ModelSerializer):
                 "is_read": message.is_read,
             }
         return None
+    
+
+
+class MachineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Machine
+        fields = ["id", "name", "type", "description", "created_by", "created_at"]
+        read_only_fields = ["id", "created_by", "created_at"]
+
+
+class WorkoutSetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkoutSet
+        fields = ["id", "set_number", "reps", "weight_kg"]
+        read_only_fields = ["id","set_number"]
+
+
+class WorkoutLogSerializer(serializers.ModelSerializer):
+    sets = WorkoutSetSerializer(many=True)
+
+    class Meta:
+        model = WorkoutLog
+        fields = ["id", "membre", "machine", "notes", "logged_at", "sets"]
+        read_only_fields = ["id", "logged_at","membre"]
+
+    def create(self, validated_data):
+        sets_data = validated_data.pop("sets")
+        workout_log = WorkoutLog.objects.create(**validated_data)
+        for i, set_data in enumerate(sets_data, start=1):
+            WorkoutSet.objects.create(
+                workout_log=workout_log,
+                set_number=i,
+                **set_data
+            )
+        return workout_log
+
+
+class WorkoutProgressSerializer(serializers.ModelSerializer):
+    """Used for progress tracking — one entry per log with max weight of that session."""
+    max_weight_kg = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkoutLog
+        fields = ["id", "logged_at", "max_weight_kg", "sets"]
+
+    def get_max_weight_kg(self, obj):
+        weights = obj.sets.values_list("weight_kg", flat=True)
+        return max(weights) if weights else 0

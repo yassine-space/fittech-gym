@@ -9,8 +9,9 @@ from django.conf import settings
 import secrets
 from django.utils import timezone
 
-from .models import CoachCertificate, GymDailyToken, GymEntry, Message, Conversation,User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview
+from .models import CoachCertificate, GymDailyToken, GymEntry, Machine, Message, Conversation,User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog
 from .serializers import (
+    MachineSerializer,
     UserSerializer,
     RegisterSerializer,
     ChangePasswordSerializer,
@@ -32,7 +33,9 @@ from .serializers import (
     CoachReviewSerializer,
     CoachCertificateSerializer,
     ConversationSerializer,
-    MessageSerializer
+    MessageSerializer,
+    WorkoutLogSerializer,
+    WorkoutProgressSerializer
 )
 from django.db import transaction
 
@@ -901,3 +904,115 @@ class MessageDeleteView(generics.UpdateAPIView):
         message.deleted_at = timezone.now()
         message.save()
         return Response({"detail": "Message deleted."})
+    
+
+class MachineListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /machines/  — authenticated
+    POST /machines/  — admin or coach
+    """
+    queryset = Machine.objects.all()
+    serializer_class = MachineSerializer
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAdminOrCoach()]
+        return [permissions.IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+class MachineDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """GET/PUT/DELETE /machines/<pk>/"""
+    queryset = Machine.objects.all()
+    serializer_class = MachineSerializer
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.IsAuthenticated()]
+        return [IsAdminOrCoach()]
+
+
+class WorkoutLogListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /workouts/  — member sees own logs, coach sees assigned members logs, admin sees all
+    POST /workouts/  — member only
+    """
+    serializer_class = WorkoutLogSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.role == "admin":
+            return WorkoutLog.objects.all()
+
+        if user.role == "coach":
+            coach = user.coach_profile
+            assigned_membre_ids = Membre.objects.filter(
+                coach=coach
+            ).values_list("id", flat=True)
+            return WorkoutLog.objects.filter(membre_id__in=assigned_membre_ids)
+
+        if user.role == "membre":
+            return WorkoutLog.objects.filter(membre__user=user)
+
+        return WorkoutLog.objects.none()
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        membre = get_object_or_404(Membre, user=self.request.user)
+
+        # Only advanced and full tier members can log workouts
+        active_sub = MembreSubscription.objects.filter(
+            membre=membre,
+            status="active",
+        ).select_related("plan").first()
+
+        if not active_sub or active_sub.plan.tier == "basic":
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Workout logging requires an advanced or full options plan.")
+
+        serializer.save(membre=membre)
+
+
+class WorkoutLogDetailView(generics.RetrieveDestroyAPIView):
+    """GET/DELETE /workouts/<pk>/"""
+    serializer_class = WorkoutLogSerializer
+    permission_classes = [IsOwnerOrAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == "admin":
+            return WorkoutLog.objects.all()
+        if user.role == "coach":
+            coach = user.coach_profile
+            assigned_membre_ids = Membre.objects.filter(
+                coach=coach
+            ).values_list("id", flat=True)
+            return WorkoutLog.objects.filter(membre_id__in=assigned_membre_ids)
+        return WorkoutLog.objects.filter(membre__user=user)
+
+
+class WorkoutProgressView(generics.ListAPIView):
+    """
+    GET /workouts/progress/?machine=<uuid>
+    Returns workout history for a specific machine — used for progress chart.
+    """
+    serializer_class = WorkoutProgressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        machine_id = self.request.query_params.get("machine")
+        if not machine_id:
+            return WorkoutLog.objects.none()
+
+        membre = get_object_or_404(Membre, user=self.request.user)
+        return WorkoutLog.objects.filter(
+            membre=membre,
+            machine_id=machine_id,
+        ).prefetch_related("sets")

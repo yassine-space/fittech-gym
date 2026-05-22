@@ -350,3 +350,51 @@ class Message(models.Model):
 
     def __str__(self):
         return f"{self.sender} → {self.conversation} ({self.message_type})"
+    
+
+
+
+class Machine(models.Model):
+    MACHINE_TYPE_CHOICES = [
+        ("machine", "Machine"),
+        ("free_weight", "Free Weight"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    type = models.CharField(max_length=20, choices=MACHINE_TYPE_CHOICES)
+    description = models.TextField(blank=True)
+    created_by = models.ForeignKey("User", on_delete=models.SET_NULL, null=True, related_name="machines_created")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.type})"
+
+
+class WorkoutLog(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    membre = models.ForeignKey("Membre", on_delete=models.CASCADE, related_name="workout_logs")
+    machine = models.ForeignKey(Machine, on_delete=models.CASCADE, related_name="workout_logs")
+    notes = models.TextField(blank=True)
+    logged_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-logged_at"]
+
+    def __str__(self):
+        return f"{self.membre} — {self.machine} @ {self.logged_at.date()}"
+
+
+class WorkoutSet(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workout_log = models.ForeignKey(WorkoutLog, on_delete=models.CASCADE, related_name="sets")
+    set_number = models.PositiveIntegerField()
+    reps = models.PositiveIntegerField()
+    weight_kg = models.DecimalField(max_digits=5, decimal_places=2)
+
+    class Meta:
+        ordering = ["set_number"]
+        unique_together = ("workout_log", "set_number")
+
+    def __str__(self):
+        return f"Set {self.set_number} — {self.reps} reps @ {self.weight_kg}kg"
