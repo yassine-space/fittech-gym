@@ -147,6 +147,26 @@ class CoachService {
   Future<void> deleteCertificate(String coachId, String certId) async {
     await _api.request(DioMethode.delete, '/coaches/$coachId/certificates/$certId/');
   }
+
+  // ─── Assigned Members ────────────────────────────────────────────────────
+
+  /// GET /coaches/me/membres/ — list members assigned to the authenticated coach.
+  Future<List<Membre>> getAssignedMembers() async {
+    final res = await _api.request(DioMethode.get, '/coaches/me/membres/');
+    final List data = res.data is List ? res.data : (res.data['results'] ?? []);
+    return data.map((e) => Membre.fromJson(e)).toList();
+  }
+
+  /// PATCH /reservations/<id>/ — update a reservation's status (attended / no_show / etc.)
+  Future<CourseReservation> updateReservationStatus(
+      String id, String status) async {
+    final res = await _api.request(
+      DioMethode.patch,
+      '/reservations/$id/',
+      data: {'reservation_status': status},
+    );
+    return CourseReservation.fromJson(res.data);
+  }
 // Inside CoachService.dart
 
 Future<void> addCertificate({
