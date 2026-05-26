@@ -62,6 +62,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "created_at": message.created_at.isoformat(),
                 }
             )
+        # Notify recipient only if offline
+            await self.notify_recipient_if_offline(message)
 
         elif action == "mark_read":
             await self.mark_messages_read(self.conversation_id, self.user)
@@ -153,3 +155,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def set_online_status(self, user, status):
         User.objects.filter(id=user.id).update(is_online=status)
+
+
+    @database_sync_to_async
+    def notify_recipient_if_offline(self, message):
+        from .models import Notification
+        conversation = Conversation.objects.select_related(
+            "coach__user", "membre__user"
+        ).get(id=self.conversation_id)
+
+    # Determine recipient
+        if conversation.coach.user == self.user:
+            recipient = conversation.membre.user
+        else:
+            recipient = conversation.coach.user
+
+    # Only notify if offline
+        if not recipient.is_online:
+            sender_name = f"{self.user.first_name} {self.user.last_name}"
+            Notification.objects.create(
+                user=recipient,
+                notification_type="new_message",
+                title=f"New message from {sender_name}",
+                body=message.content if message.message_type == "text" else f"[{message.message_type}]",
+            )

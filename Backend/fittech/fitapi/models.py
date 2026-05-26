@@ -398,3 +398,28 @@ class WorkoutSet(models.Model):
 
     def __str__(self):
         return f"Set {self.set_number} — {self.reps} reps @ {self.weight_kg}kg"
+
+
+
+
+class Notification(models.Model):
+    NOTIFICATION_TYPE_CHOICES = [
+        ("waitlist_promotion", "Waitlist Promotion"),
+        ("subscription_expiry", "Subscription Expiry Warning"),
+        ("coach_assignment", "Coach Assignment"),
+        ("new_message", "New Message"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey("User", on_delete=models.CASCADE, related_name="notifications")
+    notification_type = models.CharField(max_length=30, choices=NOTIFICATION_TYPE_CHOICES)
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} — {self.notification_type} ({'read' if self.is_read else 'unread'})"

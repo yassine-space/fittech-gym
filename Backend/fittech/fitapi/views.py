@@ -9,9 +9,10 @@ from django.conf import settings
 import secrets
 from django.utils import timezone
 
-from .models import CoachCertificate, GymDailyToken, GymEntry, Machine, Message, Conversation,User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog
+from .models import CoachCertificate, GymDailyToken, GymEntry, Machine, Message, Conversation, Notification,User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog
 from .serializers import (
     MachineSerializer,
+    NotificationSerializer,
     UserSerializer,
     RegisterSerializer,
     ChangePasswordSerializer,
@@ -636,7 +637,23 @@ class AssignCoachView(APIView):
         membre.coach = coach
         membre.save()
 
-        return Response({"detail": f"Coach assigned successfully."})
+        # Notify the membre
+        Notification.objects.create(
+            user=membre.user,
+            notification_type="coach_assignment",
+            title="Coach assigned",
+            body=f"{coach.user.first_name} {coach.user.last_name} is now your coach.",
+        )
+
+        # Notify the coach
+        Notification.objects.create(
+            user=coach.user,
+            notification_type="coach_assignment",
+            title="New member assigned",
+            body=f"{membre.user.first_name} {membre.user.last_name} has selected you as their coach.",
+        )
+
+        return Response({"detail": "Coach assigned successfully."})
 
     def delete(self, request):
         membre, _ = self._get_membre_and_validate_plan(request)
@@ -748,6 +765,15 @@ class CancelReservationView(APIView):
                     membre=next_entry.membre,
                     reservation_status="confirmed",
                 )
+
+                # Notify promoted membre
+                Notification.objects.create(
+                    user=next_entry.membre.user,
+                    notification_type="waitlist_promotion",
+                    title="You got a spot!",
+                    body=f"A spot opened up in {reservation.course.title}. Your reservation is now confirmed.",
+                )
+
                 next_entry.delete()
                 # Re-number remaining waitlist positions
                 for i, entry in enumerate(
@@ -1016,3 +1042,32 @@ class WorkoutProgressView(generics.ListAPIView):
             membre=membre,
             machine_id=machine_id,
         ).prefetch_related("sets")
+    
+
+class NotificationListView(generics.ListAPIView):
+    """GET /notifications/ — list my notifications"""
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user)
+
+
+class NotificationMarkReadView(APIView):
+    """PATCH /notifications/<pk>/read/ — mark a single notification as read"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        notification = get_object_or_404(Notification, pk=pk, user=request.user)
+        notification.is_read = True
+        notification.save()
+        return Response({"detail": "Notification marked as read."})
+
+
+class NotificationMarkAllReadView(APIView):
+    """PATCH /notifications/read-all/ — mark all notifications as read"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request):
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({"detail": "All notifications marked as read."})    

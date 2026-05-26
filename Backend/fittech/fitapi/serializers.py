@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import CoachCertificate, Conversation, Machine, Message, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog, WorkoutSet
+from .models import CoachCertificate, Conversation, Machine, Message, Notification, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog, WorkoutSet
 
 
 # ─────────────────────────────────────────
@@ -457,3 +457,12 @@ class WorkoutProgressSerializer(serializers.ModelSerializer):
     def get_max_weight_kg(self, obj):
         weights = obj.sets.values_list("weight_kg", flat=True)
         return max(weights) if weights else 0
+    
+
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ["id", "notification_type", "title", "body", "is_read", "created_at"]
+        read_only_fields = ["id", "notification_type", "title", "body", "created_at"]

@@ -15,6 +15,7 @@ from .views import (
     MachineListCreateView,
     MessageDeleteView,
     MessageListCreateView,
+    NotificationMarkReadView,
     RegisterView,
     LoginView,
     LogoutView,
@@ -53,6 +54,8 @@ from .views import (
     WorkoutLogDetailView,
     WorkoutLogListCreateView,
     WorkoutProgressView,
+    NotificationListView,
+    NotificationMarkAllReadView,
 )
 
 urlpatterns = [
@@ -143,4 +146,11 @@ urlpatterns = [
     path("workouts/", WorkoutLogListCreateView.as_view(), name="workout-list"),
     path("workouts/progress/", WorkoutProgressView.as_view(), name="workout-progress"),  # before workouts/<pk>/
     path("workouts/<uuid:pk>/", WorkoutLogDetailView.as_view(), name="workout-detail"),
+    # Notifications
+    path("notifications/", NotificationListView.as_view()),
+    path("notifications/read-all/", NotificationMarkAllReadView.as_view()),  # before <pk>
+    path("notifications/<uuid:pk>/read/", NotificationMarkReadView.as_view()),
+
+
+
 ]
