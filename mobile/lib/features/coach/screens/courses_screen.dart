@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile/core/models/course.dart';
 import 'package:mobile/core/providers/coach_provider.dart';
+import 'package:mobile/features/coach/screens/course_detail_screen.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const _kOrange = Color(0xFFD44820);
@@ -55,6 +56,28 @@ class _CoachCoursesScreenState extends State<CoachCoursesScreen>
         onCreated: () {
           Navigator.pop(context);
           _showSnack('✅ Course created successfully!', _kGreen);
+        },
+      ),
+    );
+  }
+
+  void _openCourseDetail(Course course) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CourseDetailScreen(course: course)),
+    );
+  }
+
+  void _openEditSheet(Course course) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditCourseSheet(
+        course: course,
+        onEdited: () {
+          Navigator.pop(context);
+          _showSnack('✅ Course updated successfully!', _kGreen);
         },
       ),
     );
@@ -340,7 +363,8 @@ class _CoachCoursesScreenState extends State<CoachCoursesScreen>
           course: courses[i],
           isEnded: isEnded,
           onDelete: () => _onDelete(courses[i]),
-          onEdit: () => _showSnack('Edit — coming soon', _kNavy),
+          onEdit: () => _openEditSheet(courses[i]),
+          onParticipants: () => _openCourseDetail(courses[i]),
         ),
       ),
     );
@@ -422,12 +446,14 @@ class _CoachCourseCard extends StatelessWidget {
   final bool isEnded;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
+  final VoidCallback onParticipants;
 
   const _CoachCourseCard({
     required this.course,
     required this.isEnded,
     required this.onDelete,
     required this.onEdit,
+    required this.onParticipants,
   });
 
   Color get _levelColor => switch (course.level) {
@@ -542,9 +568,10 @@ class _CoachCourseCard extends StatelessWidget {
                     ]),
                     const SizedBox(width: 10),
                     // Action menu
-                    if (!isEnded)
+                  if (!isEnded)
                       PopupMenuButton<String>(
                         onSelected: (v) {
+                          if (v == 'participants') onParticipants();
                           if (v == 'edit') onEdit();
                           if (v == 'delete') onDelete();
                         },
@@ -1158,6 +1185,384 @@ class _InputField extends StatelessWidget {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Edit Course Bottom Sheet ─────────────────────────────────────────────────
+class _EditCourseSheet extends StatefulWidget {
+  final Course course;
+  final VoidCallback onEdited;
+
+  const _EditCourseSheet({required this.course, required this.onEdited});
+
+  @override
+  State<_EditCourseSheet> createState() => _EditCourseSheetState();
+}
+
+class _EditCourseSheetState extends State<_EditCourseSheet> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _descCtrl;
+  late final TextEditingController _maxCtrl;
+  late final TextEditingController _durationCtrl;
+
+  late String _level;
+  late DateTime _date;
+  late TimeOfDay _time;
+  bool _submitting = false;
+
+  static const _levels = ['beginner', 'intermediate', 'advanced'];
+
+  @override
+  void initState() {
+    super.initState();
+    final c = widget.course;
+    _titleCtrl = TextEditingController(text: c.title);
+    _descCtrl = TextEditingController(text: c.description);
+    _maxCtrl = TextEditingController(text: '${c.maxParticipants}');
+    _durationCtrl = TextEditingController(text: '${c.durationMinutes}');
+    _level = c.level;
+    _date = c.dateTime;
+    _time = TimeOfDay(hour: c.dateTime.hour, minute: c.dateTime.minute);
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    _maxCtrl.dispose();
+    _durationCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx)
+            .copyWith(colorScheme: const ColorScheme.light(primary: _kOrange)),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _date = picked);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _time,
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx)
+            .copyWith(colorScheme: const ColorScheme.light(primary: _kOrange)),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _time = picked);
+  }
+
+  Future<void> _submit() async {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) {
+      _showError('Please enter a course title.');
+      return;
+    }
+    final maxP = int.tryParse(_maxCtrl.text.trim());
+    if (maxP == null || maxP < 1) {
+      _showError('Enter a valid max participants number.');
+      return;
+    }
+    final duration = int.tryParse(_durationCtrl.text.trim());
+    if (duration == null || duration < 1) {
+      _showError('Enter a valid duration in minutes.');
+      return;
+    }
+
+    final dateTime = DateTime(
+        _date.year, _date.month, _date.day, _time.hour, _time.minute);
+
+    setState(() => _submitting = true);
+    try {
+      await context.read<CoachProvider>().updateCourse(
+            widget.course.id,
+            title: title,
+            description: _descCtrl.text.trim(),
+            level: _level,
+            dateTime: dateTime,
+            durationMinutes: duration,
+            maxParticipants: maxP,
+          );
+      widget.onEdited();
+    } catch (_) {
+      setState(() => _submitting = false);
+      _showError('Failed to update course. Please try again.');
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
+      backgroundColor: _kRed,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(24, 20, 24, 24 + bottom),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Title row
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                      color: _kOrangeSoft,
+                      borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.edit_rounded,
+                      color: _kOrange, size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Edit Course',
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: _kNavy)),
+                    Text('Update course details below',
+                        style: TextStyle(fontSize: 13, color: _kGrey)),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Course title
+            _FieldLabel('Course Title'),
+            const SizedBox(height: 6),
+            _InputField(
+                controller: _titleCtrl,
+                hint: 'e.g. Morning HIIT Blast',
+                icon: Icons.fitness_center_rounded),
+            const SizedBox(height: 16),
+
+            // Description
+            _FieldLabel('Description (optional)'),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _descCtrl,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'What will participants do in this course?',
+                hintStyle:
+                    TextStyle(color: _kGrey.withOpacity(0.7), fontSize: 13),
+                filled: true,
+                fillColor: _kBg,
+                contentPadding: const EdgeInsets.all(14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Level selector
+            _FieldLabel('Level'),
+            const SizedBox(height: 8),
+            Row(
+              children: _levels.map((l) {
+                final selected = _level == l;
+                final color = switch (l) {
+                  'beginner' => _kGreen,
+                  'intermediate' => _kOrange,
+                  'advanced' => _kRed,
+                  _ => _kGrey,
+                };
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _level = l),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: EdgeInsets.only(right: l != 'advanced' ? 8 : 0),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: selected ? color.withOpacity(0.12) : _kBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selected ? color : Colors.transparent,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        l[0].toUpperCase() + l.substring(1),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: selected ? color : _kGrey,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+
+            // Date & Time
+            Row(children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FieldLabel('Date'),
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: _pickDate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 14),
+                        decoration: BoxDecoration(
+                            color: _kBg,
+                            borderRadius: BorderRadius.circular(14)),
+                        child: Row(children: [
+                          const Icon(Icons.calendar_today_rounded,
+                              size: 16, color: _kOrange),
+                          const SizedBox(width: 8),
+                          Text(DateFormat('d MMM yyyy').format(_date),
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: _kNavy)),
+                        ]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FieldLabel('Time'),
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: _pickTime,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 14),
+                        decoration: BoxDecoration(
+                            color: _kBg,
+                            borderRadius: BorderRadius.circular(14)),
+                        child: Row(children: [
+                          const Icon(Icons.access_time_rounded,
+                              size: 16, color: _kOrange),
+                          const SizedBox(width: 8),
+                          Text(_time.format(context),
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: _kNavy)),
+                        ]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ]),
+            const SizedBox(height: 16),
+
+            // Duration & Max
+            Row(children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FieldLabel('Duration (min)'),
+                    const SizedBox(height: 6),
+                    _InputField(
+                        controller: _durationCtrl,
+                        hint: '60',
+                        icon: Icons.timer_outlined,
+                        keyboardType: TextInputType.number),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FieldLabel('Max Participants'),
+                    const SizedBox(height: 6),
+                    _InputField(
+                        controller: _maxCtrl,
+                        hint: '10',
+                        icon: Icons.group_outlined,
+                        keyboardType: TextInputType.number),
+                  ],
+                ),
+              ),
+            ]),
+            const SizedBox(height: 28),
+
+            // Submit button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _submitting ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kOrange,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: _kOrange.withOpacity(0.5),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  elevation: 0,
+                ),
+                child: _submitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : const Text('💾  Save Changes',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 16)),
+              ),
+            ),
+          ],
         ),
       ),
     );

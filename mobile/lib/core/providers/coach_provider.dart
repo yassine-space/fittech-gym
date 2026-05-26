@@ -44,7 +44,6 @@ class CoachProvider extends ChangeNotifier {
     String? biography,
     int? yearsOfExperience,
   }) async {
-    // ✅ USING THE SERVICE METHOD
     await _api.updateMyProfile({
       'specialties': ?specialties,
       'biography': ?biography,
@@ -58,7 +57,6 @@ class CoachProvider extends ChangeNotifier {
     String? lastName,
     String? phone,
   }) async {
-    // ✅ USING THE SERVICE METHOD
     await _api.updateMyUser({
       'first_name': ?firstName,
       'last_name': ?lastName,
@@ -180,8 +178,29 @@ class CoachProvider extends ChangeNotifier {
   }
 
   Future<void> deleteCourse(String courseId) async {
-    // ✅ USING THE SERVICE METHOD
     await _api.deleteCourse(courseId);
+    await loadCourses();
+  }
+
+  Future<void> updateCourse(
+    String courseId, {
+    required String title,
+    required String description,
+    required String level,
+    required DateTime dateTime,
+    required int durationMinutes,
+    required int maxParticipants,
+  }) async {
+    if (_profile == null) return;
+    await _api.updateCourse(courseId, {
+      'title': title,
+      'description': description,
+      'level_required': level,
+      'date_time': dateTime.toIso8601String(),
+      'duration_minutes': durationMinutes,
+      'max_participants': maxParticipants,
+      'coach': _profile!.id,
+    });
     await loadCourses();
   }
 
@@ -295,6 +314,11 @@ class CoachProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> updateReservationStatus(String reservationId, String status) async {
+    await _api.updateReservationStatus(reservationId, status);
+    await loadReservations();
+  }
+
   // ── Waitlist ─────────────────────────────────────────────────────────────
   List<CourseWaitlist> _waitlist = [];
   bool waitlistLoading = false;
@@ -312,6 +336,27 @@ class CoachProvider extends ChangeNotifier {
       waitlistError = e.toString();
     } finally {
       waitlistLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ── Assigned Members ──────────────────────────────────────────────────────
+  List<Membre> _assignedMembers = [];
+  bool assignedMembersLoading = false;
+  String? assignedMembersError;
+
+  List<Membre> get assignedMembers => _assignedMembers;
+
+  Future<void> loadAssignedMembers() async {
+    assignedMembersLoading = true;
+    assignedMembersError = null;
+    notifyListeners();
+    try {
+      _assignedMembers = await _api.getAssignedMembers();
+    } catch (e) {
+      assignedMembersError = e.toString();
+    } finally {
+      assignedMembersLoading = false;
       notifyListeners();
     }
   }
