@@ -231,7 +231,7 @@ class WorkoutProvider extends ChangeNotifier {
         data: {
           'name': name,
           'type': type,
-          if (description != null) 'description': description,
+          'description': ?description,
         },
       );
       final idx = _machines.indexWhere((m) => m.id == machineId);

@@ -467,7 +467,7 @@ class _ProgressChartScreenState extends State<ProgressChartScreen> {
   @override
   Widget build(BuildContext context) {
     return Consumer<WorkoutProvider>(
-      builder: (_, p, __) {
+      builder: (_, p, _) {
         final isFw = widget.machine.isFreeWeight;
         final color = isFw ? _kGreen : _kOrange;
 

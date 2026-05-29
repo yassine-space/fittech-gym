@@ -35,7 +35,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Consumer<NotificationProvider>(
-      builder: (_, provider, __) {
+      builder: (_, provider, _) {
         return Scaffold(
           backgroundColor: _kBg,
           body: SafeArea(
