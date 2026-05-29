@@ -1,5 +1,18 @@
-// lib/features/coach/widgets/notification_bell.dart
+// lib/core/widgets/notification_bell.dart
+//
+// Drop-in widget used in every screen's app-bar row.
+// Shows a bell icon with an orange dot when there are unread notifications.
+// Tapping navigates to NotificationsScreen.
+//
+// Usage:
+//   import 'package:mobile/core/widgets/notification_bell.dart';
+//   ...
+//   const NotificationBell(),
+//
+// Place this file at:  lib/core/widgets/notification_bell.dart
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile/core/providers/notification_provider.dart';
 import 'package:mobile/features/coach/screens/notifications_screen.dart';
@@ -10,59 +23,53 @@ class NotificationBell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<NotificationProvider>(
-      builder: (_, provider, __) {
-        final count = provider.unreadCount;
+      builder: (context, provider, _) {
+        final hasUnread = provider.hasUnread;
+
         return GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => const NotificationsScreen()),
-          ),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NotificationsScreen(),
+              ),
+            );
+          },
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                        color: const Color(0xFF2D3142).withOpacity(0.08),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2))
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
                   ],
                 ),
-                child: Icon(
-                  count > 0
-                      ? Icons.notifications_rounded
-                      : Icons.notifications_none_rounded,
-                  color: count > 0
-                      ? const Color(0xFFD44820)
-                      : const Color(0xFF2D3142),
-                  size: 22,
+                child: const Icon(
+                  Icons.notifications_rounded,
+                  color: Color(0xFF2D3142),
+                  size: 20,
                 ),
               ),
-              if (count > 0)
+              if (hasUnread)
                 Positioned(
-                  top: -4,
-                  right: -4,
+                  top: 6,
+                  right: 6,
                   child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFD44820),
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD44820),
                       shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                        minWidth: 18, minHeight: 18),
-                    child: Text(
-                      count > 99 ? '99+' : '$count',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                      ),
-                      textAlign: TextAlign.center,
+                      border: Border.all(color: Colors.white, width: 1.5),
                     ),
                   ),
                 ),

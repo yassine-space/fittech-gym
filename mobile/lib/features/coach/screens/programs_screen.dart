@@ -98,7 +98,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           ),
           const Spacer(),
           Consumer<WorkoutProvider>(
-            builder: (_, p, __) => GestureDetector(
+            builder: (_, p, _) => GestureDetector(
               onTap: () {
                 p.loadMachines();
                 p.loadLogs();
@@ -172,7 +172,7 @@ class _MemberLogsTabState extends State<_MemberLogsTab> {
   @override
   Widget build(BuildContext context) {
     return Consumer<WorkoutProvider>(
-      builder: (_, p, __) {
+      builder: (_, p, _) {
         if (p.logsLoading && p.logs.isEmpty) {
           return const Center(
               child: CircularProgressIndicator(color: _kOrange));
@@ -371,7 +371,7 @@ class _MachinesTabState extends State<_MachinesTab> {
   @override
   Widget build(BuildContext context) {
     return Consumer<WorkoutProvider>(
-      builder: (_, p, __) {
+      builder: (_, p, _) {
         final filtered = p.machines.where((m) {
           if (_filter == 'all') return true;
           return m.type == _filter;
