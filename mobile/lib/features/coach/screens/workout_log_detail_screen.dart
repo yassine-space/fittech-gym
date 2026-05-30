@@ -35,8 +35,7 @@ class _WorkoutLogDetailScreenState extends State<WorkoutLogDetailScreen> {
 
   Future<void> _refresh() async {
     setState(() => _loading = true);
-    final fresh =
-        await context.read<WorkoutProvider>().fetchLog(_log.id);
+    final fresh = await context.read<WorkoutProvider>().fetchLog(_log.id);
     if (fresh != null && mounted) setState(() => _log = fresh);
     if (mounted) setState(() => _loading = false);
   }

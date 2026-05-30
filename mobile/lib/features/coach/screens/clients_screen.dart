@@ -39,6 +39,18 @@ class _ClientsScreenState extends State<ClientsScreen> {
   String _query = '';
 
   @override
+  void initState() {
+    super.initState();
+    // Fetch fresh data from backend API right when the dashboard opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<CoachProvider>(context, listen: false);
+      provider.loadAssignedMembers();
+      provider.loadCourses();
+      provider.loadReviews();
+    });
+  }
+  
+  @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
