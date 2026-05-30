@@ -43,11 +43,11 @@ class WorkoutSet {
   });
 
   factory WorkoutSet.fromJson(Map<String, dynamic> j) => WorkoutSet(
-        id: j['id'] ?? '',
-        setNumber: j['set_number'] ?? 0,
-        reps: j['reps'] ?? 0,
-        weightKg: (j['weight_kg'] as num?)?.toDouble() ?? 0.0,
-      );
+      id: j['id'] ?? '',
+      setNumber: j['set_number'] ?? 0,
+      reps: j['reps'] ?? 0,
+      weightKg: double.tryParse(j['weight_kg']?.toString() ?? '0') ?? 0.0, // ← fix this line
+    );
 }
 
 class WorkoutLog {
@@ -70,31 +70,52 @@ class WorkoutLog {
     required this.sets,
     required this.maxWeightKg,
   });
-
+  
   factory WorkoutLog.fromJson(Map<String, dynamic> j) {
-    final sets = (j['sets'] as List? ?? [])
-        .map((s) => WorkoutSet.fromJson(s))
-        .toList();
-    final membre = j['membre'] is Map ? j['membre'] : {};
-    final membreUser = membre['user'] is Map ? membre['user'] : {};
-    final firstName = membreUser['first_name'] ?? '';
-    final lastName = membreUser['last_name'] ?? '';
+  final sets = (j['sets'] as List? ?? [])
+      .map((s) => WorkoutSet.fromJson(s))
+      .toList();
 
-    return WorkoutLog(
-      id: j['id'] ?? '',
-      membreId: membre['id']?.toString() ?? '',
-      membreName: '$firstName $lastName'.trim(),
-      machine: Machine.fromJson(
-          j['machine'] is Map ? j['machine'] : {'id': '', 'name': '', 'type': 'machine'}),
-      notes: j['notes'],
-      loggedAt: DateTime.tryParse(j['logged_at'] ?? '') ?? DateTime.now(),
-      sets: sets,
-      maxWeightKg: (j['max_weight_kg'] as num?)?.toDouble() ??
-          (sets.isEmpty
-              ? 0.0
-              : sets.map((s) => s.weightKg).reduce((a, b) => a > b ? a : b)),
+  // handle both nested object AND plain string ID
+  final membreRaw = j['membre'];
+  final String membreId;
+  final String membreName;
+  if (membreRaw is Map) {
+    final membreUser = membreRaw['user'] is Map ? membreRaw['user'] : {};
+    membreId = membreRaw['id']?.toString() ?? '';
+    membreName = '${membreUser['first_name'] ?? ''} ${membreUser['last_name'] ?? ''}'.trim();
+  } else {
+    membreId = membreRaw?.toString() ?? '';
+    membreName = '';
+  }
+
+  // handle both nested object AND plain string ID
+  final machineRaw = j['machine'];
+  final Machine machine;
+  if (machineRaw is Map) {
+    machine = Machine.fromJson(machineRaw as Map<String, dynamic>);
+  } else {
+    machine = Machine(
+      id: machineRaw?.toString() ?? '',
+      name: 'Unknown',
+      type: 'machine',
     );
   }
+
+  return WorkoutLog(
+    id: j['id'] ?? '',
+    membreId: membreId,
+    membreName: membreName,
+    machine: machine,
+    notes: j['notes'],
+    loggedAt: DateTime.tryParse(j['logged_at'] ?? '') ?? DateTime.now(),
+    sets: sets,
+    maxWeightKg: (j['max_weight_kg'] as num?)?.toDouble() ??
+        (sets.isEmpty
+            ? 0.0
+            : sets.fold<double>(0.0, (best, s) => s.weightKg > best ? s.weightKg : best)),
+  );
+}
 
   int get totalSets => sets.length;
   int get totalReps => sets.fold(0, (sum, s) => sum + s.reps);
@@ -118,20 +139,17 @@ class ProgressPoint {
   });
 
   factory ProgressPoint.fromJson(Map<String, dynamic> j) {
-    final sets = (j['sets'] as List? ?? [])
-        .map((s) => WorkoutSet.fromJson(s))
-        .toList();
-    return ProgressPoint(
-      id: j['id'] ?? '',
-      loggedAt: DateTime.tryParse(j['logged_at'] ?? '') ?? DateTime.now(),
-      maxWeightKg: (j['max_weight_kg'] as num?)?.toDouble() ??
-          (sets.isEmpty
-              ? 0.0
-              : sets.map((s) => s.weightKg).reduce((a, b) => a > b ? a : b)),
-      sets: sets,
-      notes: j['notes'],
-    );
-  }
+  final sets = (j['sets'] as List? ?? [])
+      .map((s) => WorkoutSet.fromJson(s))
+      .toList();
+  return ProgressPoint(
+    id: j['id'] ?? '',
+    loggedAt: DateTime.tryParse(j['logged_at'] ?? '') ?? DateTime.now(),
+    maxWeightKg: double.tryParse(j['max_weight_kg']?.toString() ?? '0') ?? 0.0, // ← fix
+    sets: sets,
+    notes: j['notes'],
+  );
+}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -279,6 +297,7 @@ class WorkoutProvider extends ChangeNotifier {
       _progress = data.map((j) => ProgressPoint.fromJson(j)).toList();
       _progress.sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
     } catch (e) {
+      print('PROGRESS_ERROR: $e'); 
       _progressError = 'Failed to load progress';
     } finally {
       _progressLoading = false;
@@ -300,26 +319,48 @@ class WorkoutProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadLogs() async {
-    _logsLoading = true;
-    _logsError = null;
-    notifyListeners();
+  // field — add near the top of WorkoutProvider class
+Set<String> _memberIds = {};
+Set<String> get memberIds => _memberIds;
 
-    try {
-      final res = await Apiservice.instance
-          .request(DioMethode.get, '/workouts/');
-      final List data = res.data;
-      _logs = data.map((j) => WorkoutLog.fromJson(j)).toList();
-      // Sort newest first
-      _logs.sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
-    } catch (e) {
-      _logsError = 'Failed to load workout logs';
-    } finally {
-      _logsLoading = false;
-      notifyListeners();
+// replace loadLogs() entirely
+Future<void> loadLogs() async {
+  _logsLoading = true;
+  _logsError = null;
+  notifyListeners();
+
+  try {
+    final res = await Apiservice.instance
+        .request(DioMethode.get, '/workouts/');
+    List data = res.data as List;
+
+    if (data.isEmpty) {
+      try {
+        final membresRes = await Apiservice.instance
+            .request(DioMethode.get, '/coaches/me/membres/');
+        final List membres = membresRes.data as List;
+        _memberIds = membres
+            .map((m) => m['id']?.toString() ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet();
+      } catch (_) {
+        // membres fetch failed — not fatal, show empty logs
+      }
     }
-  }
 
+    _logs = data
+        .map((j) => WorkoutLog.fromJson(j as Map<String, dynamic>))
+        .toList();
+    _logs.sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
+  } catch (e) {
+     
+    print('WORKOUT_ERROR: $e');   
+    _logsError = 'Failed to load workout logs';
+  } finally {
+    _logsLoading = false;
+    notifyListeners();
+  }
+}
   // ─────────────────────────────────────────────────────────────────────────
   // Helpers
   // ─────────────────────────────────────────────────────────────────────────
