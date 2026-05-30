@@ -57,7 +57,12 @@ from .views import (
     WorkoutProgressView,
     NotificationListView,
     NotificationMarkAllReadView,
-    MachineReportListCreateView
+    MachineReportListCreateView,
+     # Chargily Pay ← new
+    InitiateChargilyPaymentView,
+    ChargilyWebhookView,
+    ChargilySuccessView,
+    ChargilyFailureView,
 )
 
 urlpatterns = [
@@ -155,6 +160,16 @@ urlpatterns = [
     # Reports
     path("machine-reports/", MachineReportListCreateView.as_view()),
     path("machine-reports/<uuid:pk>/status/", MachineReportStatusUpdateView.as_view()),
+
+     # ─────────────────────────────────────────
+    # 1) Mobile app calls this → gets checkout_url to open in WebView
+    path("payments/chargily/initiate/", InitiateChargilyPaymentView.as_view(), name="chargily-initiate"),
+    # 2) Chargily calls this server-to-server to update payment status
+    path("payments/chargily/webhook/",  ChargilyWebhookView.as_view(),          name="chargily-webhook"),
+    # 3) Chargily redirects user's browser to one of these after payment
+    path("payments/chargily/success/",  ChargilySuccessView.as_view(),          name="chargily-success"),
+    path("payments/chargily/failure/",  ChargilyFailureView.as_view(),          name="chargily-failure"),
+ 
 
 
 

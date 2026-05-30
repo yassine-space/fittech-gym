@@ -454,3 +454,42 @@ class MachineReport(models.Model):
     def __str__(self):
         return f"{self.machine} — {self.severity} ({self.status})"
     
+
+# ─────────────────────────────────────────
+class ChargilyCheckout(models.Model):
+ 
+    class LOCALE(models.TextChoices):
+        FRENCH  = "fr", "French"
+        ARABIC  = "ar", "Arabic"
+        ENGLISH = "en", "English"
+ 
+    class CHARGILY_METHOD(models.TextChoices):
+        EDAHABIA = "edahabia", "EDAHABIA (Algerie Poste)"
+        CIB      = "cib",      "CIB (SATIM)"
+ 
+    # One Chargily session per Payment
+    payment = models.OneToOneField(
+        Payment,
+        on_delete=models.CASCADE,
+        related_name="chargily_checkout",
+    )
+ 
+    # Filled after Chargily API responds successfully
+    chargily_id   = models.CharField(max_length=200, unique=True, null=True, blank=True)
+    checkout_url  = models.URLField(null=True, blank=True)
+ 
+    chargily_method = models.CharField(
+        max_length=20,
+        choices=CHARGILY_METHOD.choices,
+        default=CHARGILY_METHOD.EDAHABIA,
+    )
+    locale = models.CharField(
+        max_length=2,
+        choices=LOCALE.choices,
+        default=LOCALE.FRENCH,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+ 
+    def __str__(self):
+        return f"ChargilyCheckout → Payment #{self.payment.invoice_number} [{self.payment.payment_status}]"        

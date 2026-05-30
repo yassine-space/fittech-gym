@@ -1,7 +1,10 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import CoachCertificate, Conversation, Machine, MachineReport, Message, Notification, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog, WorkoutSet
+
+
+from .models import CoachCertificate, Conversation, Machine, MachineReport, Message, Notification, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog, WorkoutSet , ChargilyCheckout
+
 
 
 # ─────────────────────────────────────────
@@ -468,6 +471,58 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "notification_type", "title", "body", "created_at"]
 
 
+# ─────────────────────────────────────────
+class InitiateChargilyPaymentSerializer(serializers.Serializer):
+    """
+    Input — sent by the mobile app to start a Chargily payment session.
+ 
+    The Payment must already exist (created by admin) with:
+      payment_method = "online"  and  payment_status = "pending"
+ 
+    Example:
+    {
+        "payment_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "chargily_method": "edahabia",
+        "locale": "fr"
+    }
+    """
+    payment_id      = serializers.UUIDField()
+    chargily_method = serializers.ChoiceField(
+        choices=ChargilyCheckout.CHARGILY_METHOD.choices,
+        default=ChargilyCheckout.CHARGILY_METHOD.EDAHABIA,
+    )
+    locale = serializers.ChoiceField(
+        choices=ChargilyCheckout.LOCALE.choices,
+        default=ChargilyCheckout.LOCALE.FRENCH,
+    )
+ 
+ 
+class ChargilyCheckoutSerializer(serializers.ModelSerializer):
+    """
+    Output — returned to the mobile app after the checkout is created.
+    The app must redirect the user to checkout_url immediately.
+    """
+    payment_id     = serializers.UUIDField(source="payment.id",             read_only=True)
+    invoice_number = serializers.CharField(source="payment.invoice_number",  read_only=True)
+    amount         = serializers.DecimalField(
+        source="payment.amount", max_digits=10, decimal_places=2, read_only=True
+    )
+    payment_status = serializers.CharField(source="payment.payment_status",  read_only=True)
+ 
+    class Meta:
+        model  = ChargilyCheckout
+        fields = [
+            "id",
+            "payment_id",
+            "invoice_number",
+            "amount",
+            "payment_status",
+            "chargily_id",
+            "checkout_url",       # ← mobile app opens this URL
+            "chargily_method",
+            "locale",
+            "created_at",
+        ]
 
 
 class MachineReportSerializer(serializers.ModelSerializer):
@@ -487,3 +542,4 @@ class MachineReportStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = MachineReport
         fields = ["status"]
+

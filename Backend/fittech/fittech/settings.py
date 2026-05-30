@@ -35,6 +35,11 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+CHARGILY_KEY    = os.getenv("CHARGILY_KEY")
+CHARGILY_SECRET = os.getenv("CHARGILY_SECRET")
+# Test URL → switch to https://pay.chargily.net/api/v2/ when going live
+CHARGILY_URL    = os.getenv("CHARGILY_URL", "https://pay.chargily.net/test/api/v2/")
+
 
 
 AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]

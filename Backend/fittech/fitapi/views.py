@@ -8,8 +8,12 @@ from django.core.mail import send_mail
 from django.conf import settings
 import secrets
 from django.utils import timezone
+from django.http import HttpResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import CoachCertificate, GymDailyToken, GymEntry, Machine, MachineReport, Message, Conversation, Notification,User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog
+
 from .serializers import (
     MachineReportSerializer,
     MachineReportStatusSerializer,
@@ -38,7 +42,9 @@ from .serializers import (
     ConversationSerializer,
     MessageSerializer,
     WorkoutLogSerializer,
-    WorkoutProgressSerializer
+    WorkoutProgressSerializer ,
+    InitiateChargilyPaymentSerializer,   # ← new
+    ChargilyCheckoutSerializer,          # ← new
 )
 from django.db import transaction
 
@@ -1073,6 +1079,7 @@ class NotificationMarkAllReadView(APIView):
     def patch(self, request):
         Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return Response({"detail": "All notifications marked as read."})    
+
     
 
 
@@ -1108,3 +1115,180 @@ class MachineReportStatusUpdateView(generics.UpdateAPIView):
 
     def get_permissions(self):
         return [IsAdmin()]
+
+
+# ─────────────────────────────────────────
+ 
+class InitiateChargilyPaymentView(APIView):
+    """
+    POST /payments/chargily/initiate/
+ 
+    Called by the mobile app when the user taps "Pay Online".
+    Requires a Payment that already exists with:
+      - payment_method = "online"
+      - payment_status = "pending"
+ 
+    Request body:
+    {
+        "payment_id": "<uuid>",
+        "chargily_method": "edahabia" | "cib",   (optional, default: edahabia)
+        "locale": "fr" | "ar" | "en"             (optional, default: fr)
+    }
+ 
+    Response 201:
+    {
+        "checkout_url": "https://pay.chargily.net/...",   ← open this in WebView
+        ...
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+ 
+    def post(self, request):
+        serializer = InitiateChargilyPaymentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+ 
+        payment_id      = serializer.validated_data["payment_id"]
+        chargily_method = serializer.validated_data["chargily_method"]
+        locale          = serializer.validated_data["locale"]
+ 
+        # Payment must belong to the requesting user and be eligible
+        try:
+            payment = Payment.objects.get(
+                id=payment_id,
+                membre__user=request.user,
+                payment_status="pending",
+                payment_method="online",
+            )
+        except Payment.DoesNotExist:
+            return Response(
+                {"detail": "Payment not found or not eligible for online payment."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+ 
+        # If already initiated, return the existing checkout URL (idempotent)
+        if hasattr(payment, "chargily_checkout"):
+            existing = payment.chargily_checkout
+            return Response(
+                {
+                    "detail": "Checkout already initiated.",
+                    "checkout_url": existing.checkout_url,
+                },
+                status=status.HTTP_200_OK,
+            )
+ 
+        # Create local record first
+        chargily_checkout = ChargilyCheckout.objects.create(
+            payment=payment,
+            chargily_method=chargily_method,
+            locale=locale,
+        )
+ 
+        # Build absolute callback URLs
+        success_url = request.build_absolute_uri("/payments/chargily/success/")
+        failure_url = request.build_absolute_uri("/payments/chargily/failure/")
+        webhook_url = request.build_absolute_uri("/payments/chargily/webhook/")
+ 
+        try:
+            checkout_entity = build_checkout_entity(
+                payment, chargily_checkout, success_url, failure_url, webhook_url
+            )
+            response = client.create_checkout(checkout=checkout_entity)
+ 
+            chargily_checkout.chargily_id  = response["id"]
+            chargily_checkout.checkout_url = response["checkout_url"]
+            chargily_checkout.save()
+ 
+        except Exception as e:
+            chargily_checkout.delete()
+            return Response(
+                {"detail": f"Chargily API error: {str(e)}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+ 
+        return Response(
+            ChargilyCheckoutSerializer(chargily_checkout).data,
+            status=status.HTTP_201_CREATED,
+        )
+ 
+ 
+@method_decorator(csrf_exempt, name="dispatch")
+class ChargilyWebhookView(APIView):
+    """
+    POST /payments/chargily/webhook/
+ 
+    Chargily calls this server-to-server when payment status changes.
+    - No JWT auth — secured by HMAC signature validation instead.
+    - Automatically updates Payment.payment_status in your DB.
+ 
+    This endpoint must be publicly reachable (not behind a VPN or firewall).
+    For local dev, use ngrok: ngrok http 8000
+    """
+    authentication_classes = []
+    permission_classes     = []
+ 
+    def post(self, request):
+        signature = request.headers.get("signature")
+        payload   = request.body.decode("utf-8")
+ 
+        if not signature:
+            return HttpResponse(status=400)
+ 
+        # Verify the request is genuinely from Chargily
+        if not client.validate_signature(signature, payload):
+            return HttpResponse(status=403)
+ 
+        event       = json.loads(payload)
+        event_type  = event.get("type", "")
+        chargily_id = event["data"]["id"]
+ 
+        try:
+            chargily_checkout = ChargilyCheckout.objects.select_related("payment").get(
+                chargily_id=chargily_id
+            )
+        except ChargilyCheckout.DoesNotExist:
+            return HttpResponse(status=404)
+ 
+        payment = chargily_checkout.payment
+ 
+        # Map Chargily event → your Payment status
+        if event_type == "checkout.paid":
+            payment.payment_status = "paid"
+        elif event_type == "checkout.failed":
+            payment.payment_status = "failed"
+        elif event_type in ("checkout.canceled", "checkout.expired"):
+            payment.payment_status = "failed"
+        else:
+            return HttpResponse(status=400)
+ 
+        payment.save()
+        return HttpResponse(status=200)
+ 
+ 
+class ChargilySuccessView(APIView):
+    """
+    GET /payments/chargily/success/
+    Chargily redirects the user's browser here after a successful payment.
+    The mobile app should detect this URL in the WebView and show a success screen.
+    """
+    authentication_classes = []
+    permission_classes     = []
+ 
+    def get(self, request):
+        return Response({"detail": "Payment successful. Thank you!", "status": "paid"})
+ 
+ 
+class ChargilyFailureView(APIView):
+    """
+    GET /payments/chargily/failure/
+    Chargily redirects the user's browser here after a failed or cancelled payment.
+    The mobile app should detect this URL in the WebView and show a failure screen.
+    """
+    authentication_classes = []
+    permission_classes     = []
+ 
+    def get(self, request):
+        return Response(
+            {"detail": "Payment failed or was cancelled. Please try again.", "status": "failed"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )    
