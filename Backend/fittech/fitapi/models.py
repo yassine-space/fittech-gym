@@ -423,3 +423,34 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.user} — {self.notification_type} ({'read' if self.is_read else 'unread'})"
+
+
+class MachineReport(models.Model):
+    SEVERITY_CHOICES = [
+        ("minor", "Minor"),
+        ("major", "Major"),
+        ("urgent", "Urgent"),
+    ]
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("in_progress", "In Progress"),
+        ("resolved", "Resolved"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    machine = models.ForeignKey(Machine, on_delete=models.CASCADE, related_name="reports")
+    reported_by = models.ForeignKey("User", on_delete=models.CASCADE, related_name="machine_reports")
+    description = models.TextField()
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES)
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("machine", "reported_by")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.machine} — {self.severity} ({self.status})"
+    

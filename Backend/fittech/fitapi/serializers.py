@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import CoachCertificate, Conversation, Machine, Message, Notification, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog, WorkoutSet
+from .models import CoachCertificate, Conversation, Machine, MachineReport, Message, Notification, User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog, WorkoutSet
 
 
 # ─────────────────────────────────────────
@@ -466,3 +466,24 @@ class NotificationSerializer(serializers.ModelSerializer):
         model = Notification
         fields = ["id", "notification_type", "title", "body", "is_read", "created_at"]
         read_only_fields = ["id", "notification_type", "title", "body", "created_at"]
+
+
+
+
+class MachineReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MachineReport
+        fields = ["id", "machine", "reported_by", "description", "severity", "status", "created_at", "updated_at"]
+        read_only_fields = ["id", "reported_by", "status", "created_at", "updated_at"]
+
+    def validate_machine(self, value):
+        if value.type != "machine":
+            raise serializers.ValidationError("Only physical machines can be reported, not free weight exercises.")
+        return value
+
+
+class MachineReportStatusSerializer(serializers.ModelSerializer):
+    """Used by admin to update status only."""
+    class Meta:
+        model = MachineReport
+        fields = ["status"]

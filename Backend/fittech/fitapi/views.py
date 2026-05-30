@@ -9,8 +9,10 @@ from django.conf import settings
 import secrets
 from django.utils import timezone
 
-from .models import CoachCertificate, GymDailyToken, GymEntry, Machine, Message, Conversation, Notification,User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog
+from .models import CoachCertificate, GymDailyToken, GymEntry, Machine, MachineReport, Message, Conversation, Notification,User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog
 from .serializers import (
+    MachineReportSerializer,
+    MachineReportStatusSerializer,
     MachineSerializer,
     NotificationSerializer,
     UserSerializer,
@@ -1071,3 +1073,38 @@ class NotificationMarkAllReadView(APIView):
     def patch(self, request):
         Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return Response({"detail": "All notifications marked as read."})    
+    
+
+
+
+
+class MachineReportListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /machine-reports/  — admin sees all, others see their own
+    POST /machine-reports/  — member or coach
+    """
+    serializer_class = MachineReportSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == "admin":
+            return MachineReport.objects.select_related("machine", "reported_by").all()
+        return MachineReport.objects.select_related("machine", "reported_by").filter(reported_by=user)
+
+    def get_permissions(self):
+        return [permissions.IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        serializer.save(reported_by=self.request.user)
+
+
+class MachineReportStatusUpdateView(generics.UpdateAPIView):
+    """
+    PATCH /machine-reports/<pk>/status/  — admin only
+    """
+    queryset = MachineReport.objects.all()
+    serializer_class = MachineReportStatusSerializer
+    permission_classes = [IsAdmin()]
+
+    def get_permissions(self):
+        return [IsAdmin()]
