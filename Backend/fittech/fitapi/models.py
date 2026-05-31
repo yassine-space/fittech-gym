@@ -263,7 +263,9 @@ class CoachReview(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     coach = models.ForeignKey("Coach", on_delete=models.CASCADE, related_name="reviews")
     membre = models.ForeignKey("Membre", on_delete=models.CASCADE, related_name="reviews")
-    rating = models.PositiveSmallIntegerField(
+    rating = models.DecimalField(
+        max_digits=2,
+        decimal_places=1,
         validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
     comment = models.TextField(blank=True)

@@ -197,15 +197,18 @@ class CoachReviewSerializer(serializers.ModelSerializer):
         coach = data["coach"]
 
         # Check the membre attended at least one course with this coach
+        
         attended = CourseReservation.objects.filter(
             membre=membre,
             course__coach=coach,
             reservation_status="attended",
         ).exists()
 
-        if not attended:
+        assigned = membre.coach == coach
+
+        if not attended and not assigned:
             raise serializers.ValidationError(
-                "You can only review a coach after attending one of their courses."
+                "You can only review a coach after attending one of their courses or being directly assigned to them."
             )
 
         return data

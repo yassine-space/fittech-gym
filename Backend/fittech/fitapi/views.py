@@ -1,3 +1,6 @@
+from http import client
+import json
+
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView, PermissionDenied
@@ -12,7 +15,9 @@ from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
-from .models import CoachCertificate, GymDailyToken, GymEntry, Machine, MachineReport, Message, Conversation, Notification,User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog
+from .chargily_service import build_checkout_entity
+
+from .models import ChargilyCheckout, CoachCertificate, GymDailyToken, GymEntry, Machine, MachineReport, Message, Conversation, Notification,User, Membre, Coach, SubscriptionPlan, MembreSubscription, Payment,PasswordResetToken,Course, CourseReservation, CourseWaitlist, CoachReview, WorkoutLog
 
 from .serializers import (
     MachineReportSerializer,
@@ -866,7 +871,45 @@ class GymCheckInView(APIView):
 
         return Response({"detail": "Check-in successful. Welcome!"})
     
+class MarkAttendanceView(APIView):
+    """PATCH /reservations/<pk>/mark-attended/"""
+    permission_classes = [IsCoach]
 
+    def patch(self, request, pk):
+        reservation = get_object_or_404(CourseReservation, pk=pk)
+
+        # Only the coach of that course can mark attendance
+        if reservation.course.coach.user != request.user:
+            return Response(
+                {"detail": "You can only mark attendance for your own courses."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Course must have already happened
+        if reservation.course.date_time > timezone.now():
+            return Response(
+                {"detail": "Cannot mark attendance before the course has taken place."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Must be confirmed
+        if reservation.reservation_status != "confirmed":
+            return Response(
+                {"detail": "Only confirmed reservations can be marked."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        new_status = request.data.get("status")
+        if new_status not in ("attended", "no_show"):
+            return Response(
+                {"detail": "Status must be 'attended' or 'no_show'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reservation.reservation_status = new_status
+        reservation.save()
+        return Response({"detail": f"Reservation marked as {new_status}."})
+    
 
 class ConversationListCreateView(generics.ListCreateAPIView):
     """

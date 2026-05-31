@@ -14,6 +14,7 @@ from .views import (
     MachineDetailView,
     MachineListCreateView,
     MachineReportStatusUpdateView,
+    MarkAttendanceView,
     MessageDeleteView,
     MessageListCreateView,
     NotificationMarkReadView,
@@ -134,7 +135,7 @@ urlpatterns = [
     path("reservations/<uuid:pk>/", CourseReservationDetailView.as_view(), name="reservation-detail"),
     path("reservations/<uuid:pk>/cancel/", CancelReservationView.as_view()),
     path("gym/checkin/", GymCheckInView.as_view()),
-
+    path("reservations/<uuid:pk>/mark-attended/", MarkAttendanceView.as_view()),
     # Waitlist
     path("waitlist/", CourseWaitlistListCreateView.as_view(), name="waitlist-list"),
     path("waitlist/<uuid:pk>/", CourseWaitlistDetailView.as_view(), name="waitlist-detail"),
